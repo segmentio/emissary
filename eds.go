@@ -69,7 +69,7 @@ func WithPollInterval(rslv *consul.Resolver) EdsOpt {
 
 // Implementation of the Envoy xDS gRPC Streaming Endpoint for EndpointDiscovery. When we receive
 // a new gRPC request create an EdsStreamHandler and call the handle func.
-// Handle blocks keep the gRPC connection open for bi-directionally stream updates
+// Handle blocks keeping the gRPC connection open for bi-directionally stream updates
 func (e *EdsService) StreamEndpoints(server xds.EndpointDiscoveryService_StreamEndpointsServer) error {
 	log.Debug("in stream endpoints")
 	// TODO add metric
