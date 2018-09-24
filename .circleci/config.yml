@@ -1,0 +1,142 @@
+version: 2
+jobs:
+  setup:
+    working_directory: /go/src/github.com/segmentio/emissary
+    docker:
+      - image: segment/circleci-golang:1.11
+    steps:
+      - checkout
+      - restore_cache:
+          key: vendor-{{ checksum "Gopkg.lock" }}
+      - run:
+          name: Fetching Dependencies
+          command: |
+            go get -u github.com/golang/dep/cmd/dep
+            dep ensure
+      - save_cache:
+          key: vendor-{{ checksum "Gopkg.lock" }}
+          paths: [./vendor]
+      - persist_to_workspace:
+          root: .
+          paths: [.]
+
+  build:
+    working_directory: /go/src/github.com/segmentio/emissary
+    docker:
+      - image: segment/circleci-golang:1.11
+    steps:
+      - setup_remote_docker: { reusable: true, docker_layer_caching: true }
+      - attach_workspace: { at: . }
+      - run:
+          name: Building NetC
+          command: |
+            branch=${CIRCLE_BRANCH:-master}
+            commit=$(echo -n $CIRCLE_SHA1 | cut -c -7)
+            version=${branch}/${commit}
+            go build -ldflags "-X main.version=${CIRCLE_TAG:-$version}" ./cmd/emissary
+          environment:
+            CGO_ENABLED: 0
+      - run:
+          name: Building Docker Image
+          command: |
+            docker build -t emissary -f Dockerfile .
+      - run:
+          name: Publishing Docker Images (unstable)
+          command: |
+            branch=${CIRCLE_BRANCH:-master}
+            commit=$(git rev-parse --short HEAD)
+            image=${AWS_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/emissary
+            $(aws ecr get-login --no-include-email --region ${AWS_REGION})
+            docker tag emissary ${image}:${commit}
+            docker tag emissary ${image}:${branch}
+            docker push ${image}:${commit}
+            docker push ${image}:${branch}
+      - run:
+          name: Saving Docker Image
+          command: |
+            docker save -o docker-cache.tar emissary
+      - persist_to_workspace:
+          root: .
+          paths: [docker-cache.tar]
+
+  publish:
+    working_directory: /go/src/github.com/segmentio/emissary
+    docker:
+      - image: segment/circleci-golang:1.11
+    steps:
+      - setup_remote_docker: { reusable: true, docker_layer_caching: true }
+      - attach_workspace: { at: . }
+      - run:
+          name: Publish Docker Image (stable)
+          command: |
+            commit=$(git rev-parse --short HEAD)
+            version=${CIRCLE_TAG:-circleci-$CIRCLE_BUILD_NUM}
+            image=${AWS_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/emissary
+            $(aws ecr get-login --no-include-email --region ${AWS_REGION})
+            docker load < docker-cache.tar
+            docker tag emissary ${image}:${commit}
+            docker tag emissary ${image}:${version}
+            docker tag emissary ${image}:latest
+            docker push ${image}
+
+  lint:
+    working_directory: /go/src/github.com/segmentio/emissary
+    docker:
+      - image: segment/circleci-golang:1.10
+    steps:
+      - attach_workspace: { at: . }
+      - run:
+          name: Linting Source Code
+          command: golint $(find . -type d -not -path '*/\.*' -not -path './vendor/*')
+
+  vet:
+    working_directory: /go/src/github.com/segmentio/emissary
+    docker:
+      - image: segment/circleci-golang:1.11
+    steps:
+      - attach_workspace: { at: . }
+      - run:
+          name: Vetting Source Code
+          command: go vet ./...
+
+  test:
+    working_directory: /go/src/github.com/segmentio/emissary
+    docker:
+      - image: segment/circleci-golang:1.11
+    steps:
+      - attach_workspace: { at: . }
+      - run:
+          name: Running emissary package tests
+          command: go test -v -race
+
+workflows:
+  version: 2
+  run:
+    jobs:
+      - setup:
+          filters:
+            tags: { only: /.*/ }
+
+      - build:
+          requires: [setup]
+          filters:
+            tags: { only: /.*/ }
+
+      - lint:
+          requires: [setup]
+
+      - vet:
+          requires: [setup]
+
+      - test:
+          requires: [setup]
+          filters:
+            tags: { only: /.*/ }
+
+      - publish:
+          requires:
+            - build
+            - test
+          filters:
+            tags: { only: /.*/ }
+            branches: { ignore: /.*/ }
