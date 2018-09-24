@@ -1,0 +1,2 @@
+FROM anubhavmishra/envoy-consul-sds
+CMD ["/envoy-consul-sds", "--consul-http-addr", "consul:8500"]

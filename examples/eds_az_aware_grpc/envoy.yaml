@@ -1,0 +1,81 @@
+node:
+  id: consul
+  cluster: envoy
+  locality:
+    az: "us-west-1a"
+cluster_manager:
+  local_cluster_name: server
+static_resources:
+  listeners:
+  - address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 80
+    filter_chains:
+      - filters:
+        - name: envoy.http_connection_manager
+          config:
+            stat_prefix: ingress_http
+            codec_type: AUTO
+            route_config:
+              name: local_route
+              virtual_hosts:
+                - name: local_service
+                  domains: ["*"]
+                  routes:
+                    - match: { prefix: "/" }
+                      route: { cluster: server }
+            http_filters:
+              - name: envoy.router
+  clusters:
+  - name: envoy-cluster
+      connect_timeout: 1s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      http2_protocol_options: {}
+      load_assignment:
+        cluster_name: envoy-cluster
+        endpoints:
+              - locality:
+                  region: "dc1"
+                lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: 127.0.0.1
+                          port_value: 80
+              - locality:
+                  region: "dc2"
+                lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: 127.0.0.1
+  - name: server
+    connect_timeout: 0.25s
+    lb_policy: ROUND_ROBIN
+    http_protocol_options: {}
+    common_lb_config:
+      zone_aware_lb_config: { routing_enabled: { value: 100.0 }, min_cluster_size: 1}
+    type: EDS
+    eds_cluster_config:
+      eds_config:
+        api_config_source:
+          api_type: GRPC
+          grpc_services:
+            envoy_grpc:
+              cluster_name: xds_cluster
+  - name: xds_cluster
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    common_lb_config:
+      zone_aware_lb_config: { routing_enabled: { value: 100.0 }, min_cluster_size: 1}
+    http2_protocol_options: {}
+    hosts: [{ socket_address: { address: xds, port_value: 9001 }}]
+admin:
+  access_log_path: "/dev/null"
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 8001

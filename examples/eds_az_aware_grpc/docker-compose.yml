@@ -1,0 +1,120 @@
+version: '3'
+services:
+# Envoy configuration for tracking-api <-> api-forwarder on az "a"
+  client-envoy:
+      build:
+        context: .
+        dockerfile: Dockerfile-envoy
+      volumes:
+        - ./envoy2.yaml:/etc/envoy.yaml
+      networks:
+        - envoymesh
+      expose:
+        - "80"
+        - "8001"
+      ports:
+        - "80:80"
+        - "8001:8001"
+
+  consul:
+    image: consul:latest
+    expose:
+      - "8500"
+    ports:
+      - "8500:8500"
+    networks:
+      envoymesh:
+        aliases:
+          - consul
+
+#  consul-envoy-xds:
+#    image: envoy-xds:latest
+#    expose:
+#      - "24680"
+#    ports:
+#      - "24680:24680"
+#    networks:
+#      envoymesh:
+#        aliases:
+#          - xds
+
+  consul-envoy-xds:
+    image: emissary:latest
+    expose:
+      - "9001"
+    ports:
+      - "9001:9001"
+    networks:
+      envoymesh:
+        aliases:
+          - xds
+
+#  sds:
+#    build:
+#      context: .
+#      dockerfile: Dockerfile-sds
+#    depends_on:
+#      - consul
+#    networks:
+#      envoymesh:
+#        aliases:
+#          - sds
+#    expose:
+#      - "8080"
+#    ports:
+#      - "8080:8080"
+
+  registrator:
+    image: gliderlabs/registrator:latest
+    command: "consul://consul:8500"
+    container_name: registrator
+    depends_on:
+      - consul
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock
+    networks:
+      envoymesh:
+        aliases:
+          - registrator
+
+  server-a:
+    build:
+      context: .
+      dockerfile: Dockerfile-server-a
+    command: /server a 8077
+    networks:
+      envoymesh:
+        aliases:
+          - server-a
+    expose:
+      - "8077"
+    ports:
+      - "8077:8077"
+
+  server-b:
+    build:
+      context: .
+      dockerfile: Dockerfile-server-b
+    command: /server b 8078
+    networks:
+      envoymesh:
+        aliases:
+          - server-b
+    expose:
+      - "8078"
+    ports:
+      - "8078:8078"
+
+  client-a:
+      container_name: client
+      build:
+        context: .
+        dockerfile: Dockerfile-client
+      command: /client
+      networks:
+       envoymesh:
+        aliases:
+          - client-a
+
+networks:
+  envoymesh: {}
