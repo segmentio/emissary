@@ -100,7 +100,7 @@ type edsStreamHandler struct {
 // Create a new edsStreamHandler
 func newEdsStreamHandler(server xds.EndpointDiscoveryService_StreamEndpointsServer, eds *EdsService) edsStreamHandler {
 	var rslv *consul.Resolver
-	// We allow edsServices to be constructed with a resolver to testing purposes.
+	// We allow edsServices to be constructed with a resolver for testing purposes.
 	if eds.rslv != nil {
 		rslv = eds.rslv
 	} else {
@@ -121,7 +121,7 @@ func (e *edsStreamHandler) handle() error {
 	// If we encounter an error we need to tell that goroutine to exit.
 	ctx, cancel := context.WithCancel(context.Background())
 	for {
-		// receive from the gRPC server, on error cancel and pass to done
+		// receive from the gRPC server, on error cancel and return
 		request, err := e.server.Recv()
 		if err != nil {
 			log.Infof("error in Recv %s", err)
