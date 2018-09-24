@@ -77,12 +77,12 @@ func (e *EdsService) StreamEndpoints(server xds.EndpointDiscoveryService_StreamE
 	return handler.handle()
 }
 
-// An edsStreamHandler if responsible for servicing a single client on the StreamEndpoints API.
+// An edsStreamHandler is responsible for servicing a single client on the StreamEndpoints API.
 // It retains a reference to the server and a consul resolver. Additionally it keeps a copy
-// of the last endpoint data fetched from consul and send to Envoy. This is used to determine
-// if anything has changed upstream to push updates to Envoy. lastVersion and lastNonce retain
+// of the last endpoint data fetched from consul and sent to Envoy. This is used to determine
+// if anything has changed upstream, if so we push an update to Envoy. lastVersion and lastNonce retain
 // the respective last pushes of those values to Envoy for the connection. When Envoy receives
-// an update it immediately replies after it applies the changes. We use the lastVersion and lastNonce
+// an update it immediately replies, after applying the changes. We use the lastVersion and lastNonce
 // to verify that Envoy has received and applied the last change we pushed.
 //
 // The edsStreamHandler starts a separate child goroutine to routinely query consul. We poll consul
@@ -94,7 +94,7 @@ type edsStreamHandler struct {
 	lastEndpoints      map[string][]consul.Endpoint
 	lastVersion        int
 	lastNonce          string
-	results            chan map[string][]consul.Endpoint // Had this in a separate type before but probably overkill
+	results            chan map[string][]consul.Endpoint
 }
 
 // Create a new edsStreamHandler
