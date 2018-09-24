@@ -32,6 +32,6 @@ test:
 
 PHONY: build clean
 build:
-	$Qgo build ./cmd/emissary/main.go
+	$Qgo build -o emissary cmd/emissary/main.go
 	$Qdocker build -t emissary:latest .
 
