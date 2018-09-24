@@ -120,19 +120,18 @@ func (e *edsStreamHandler) handle() error {
 	// Create a cancelable context. We need this for the child goroutine we spawn for monitoring consul.
 	// If we encounter an error we need to tell that goroutine to exit.
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	for {
 		// receive from the gRPC server, on error cancel and return
 		request, err := e.server.Recv()
 		if err != nil {
 			log.Infof("error in Recv %s", err)
-			cancel()
 			return err
 		}
 
 		// If this isn't a request to envoy.api.v2.ClusterLoadAssignment we can't handle it and something is very wrong with envoy
 		if request.TypeUrl != claURL {
 			log.Infof("unknown TypeUrl %s", request.TypeUrl)
-			cancel()
 			return errors.New(fmt.Sprintf("unknown TypeUrl %s", request.TypeUrl))
 		}
 
@@ -185,7 +184,6 @@ func (e *edsStreamHandler) handle() error {
 				if firstRequest || e.hasChanged(r) {
 					err := e.send(r, request.TypeUrl)
 					if err != nil {
-						cancel()
 						log.Infof("error sending %s", err)
 						return err
 					}
@@ -339,7 +337,7 @@ func hasAz(tags []string) (string, bool) {
 	return "", false
 }
 
-// Compare two consul.Enpoints for equality.
+// Compare two consul.Endpoints for equality.
 func compare(e1, e2 consul.Endpoint) bool {
 	if &e1 == &e2 {
 		return true
