@@ -77,7 +77,7 @@ func (e *EdsService) StreamEndpoints(server xds.EndpointDiscoveryService_StreamE
 	handler := newEdsStreamHandler(server, e)
 	err := handler.handle()
 	if err != nil {
-		log.Infof("error in handler %s", err.Error())
+		log.Infof("error in handler %s", err)
 		stats.Incr("stream-endpoints.handler.error")
 	}
 	stats.Incr("stream-endpoints.connections.closed")
@@ -138,7 +138,7 @@ func (e *edsStreamHandler) handle() error {
 
 		// If this isn't a request to envoy.api.v2.ClusterLoadAssignment we can't handle it and something is very wrong with envoy
 		if request.TypeUrl != claURL {
-			stats.Incr("type-url.unknown")
+			stats.Incr("type-url.unknown", stats.Tag{"TypeUrl", request.TypeUrl})
 			return errors.New(fmt.Sprintf("unknown TypeUrl %s", request.TypeUrl))
 		}
 
