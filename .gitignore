@@ -3,3 +3,4 @@ cmd/emissary/main
 emissary
 examples/*/client
 examples/*/server
+cover.out
