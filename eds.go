@@ -163,7 +163,7 @@ func (e *edsStreamHandler) handle() error {
 						for _, cluster := range request.ResourceNames {
 							addrs, err := e.resolver.LookupService(context.Background(), cluster)
 							if err != nil {
-								stats.Incr("resolver.error")
+								stats.Incr("resolver.error", stats.Tag{Name: "cluster", Value: cluster})
 								log.Infof("error querying resolver %s", err)
 								cancel()
 								return
