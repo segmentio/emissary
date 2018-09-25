@@ -1,4 +1,5 @@
 vendor/*
+cmd/emissary/main
 emissary
 examples/*/client
 examples/*/server

@@ -3,6 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
+	"os"
+	"syscall"
+	"time"
+
 	"github.com/apex/log"
 	xds "github.com/envoyproxy/go-control-plane/envoy/api/v2"
 	"github.com/pkg/errors"
@@ -10,19 +15,31 @@ import (
 	"github.com/segmentio/consul-go"
 	"github.com/segmentio/emissary"
 	"github.com/segmentio/events"
+	"github.com/segmentio/stats"
+	"github.com/segmentio/stats/datadog"
+	"github.com/segmentio/stats/procstats"
 	"google.golang.org/grpc"
-	"net"
-	"os"
-	"syscall"
 )
 
 type emissaryConfig struct {
-	Port   int    `conf:"port"`
-	Consul string `conf:"consul"`
+	Port      int             `conf:"port"`
+	Consul    string          `conf:"consul"`
+	Dogstatsd dogstatsdConfig `conf:"dogstatsd" help:"dogstatsd Configuration"`
 }
+
+type dogstatsdConfig struct {
+	Address    string        `conf:"address" help:"Address of the dogstatsd agent that will receive metrics"`
+	BufferSize int           `conf:"buffer-size" help:"Size of the statsd metrics buffer" validate:"min=0"`
+	FlushEvery time.Duration `conf:"flush-every" help:"Flush AT LEAST this frequently"`
+}
+
+// version will be set by CI using ld_flags to the git SHA on which the binary was built
+var version = "unknown"
 
 func eds(ctx context.Context, client *consul.Client, config *emissaryConfig) {
 	defer ctx.Done()
+	defer configureDogstatsd(ctx, config.Dogstatsd, "eds")()
+
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", config.Port))
 	if err != nil {
 		log.WithError(errors.Wrap(err, "starting EndpointDiscoveryService"))
@@ -54,8 +71,9 @@ func main() {
 
 	events.DefaultLogger.EnableDebug = false
 	config := &emissaryConfig{
-		Port:   9001,
-		Consul: "localhost:8500",
+		Port:      9001,
+		Consul:    "localhost:8500",
+		Dogstatsd: defaultDogstatsdConfig(),
 	}
 
 	switch cmd, _ := conf.LoadWith(config, ld); cmd {
@@ -65,4 +83,52 @@ func main() {
 	default:
 		panic("unknown command: " + cmd)
 	}
+}
+
+func defaultDogstatsdConfig() dogstatsdConfig {
+	return dogstatsdConfig{
+		BufferSize: 1024,
+		FlushEvery: 5 * time.Second,
+	}
+}
+
+func configureDogstatsd(ctx context.Context, config dogstatsdConfig, statsPrefix string) (teardown func()) {
+	if config.Address != "" {
+		if statsPrefix == "" {
+			panic("configureDogstatsd: Invalid statsPrefix passed. Stop.")
+		}
+
+		dd := datadog.NewClientWith(datadog.ClientConfig{
+			Address:    config.Address,
+			BufferSize: config.BufferSize,
+		})
+		stats.Register(dd)
+		stats.DefaultEngine.Prefix = fmt.Sprintf("emissary.%s", statsPrefix)
+		stats.DefaultEngine.Tags = append(stats.DefaultEngine.Tags, stats.Tag{Name: "version", Value: version})
+		stats.DefaultEngine.Tags = stats.SortTags(stats.DefaultEngine.Tags) // tags must be sorted
+
+		c := procstats.StartCollector(procstats.NewGoMetrics())
+
+		events.Log("Setup dogstatsd with addr:%{addr}s, buffersize:%{buffersize}d, prefix:%{pfx}s, version:%{version}s",
+			config.Address, config.BufferSize, statsPrefix, version)
+
+		go func() {
+			ticker := time.NewTicker(config.FlushEvery)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					stats.Flush()
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+		return func() {
+			c.Close()
+			stats.Flush()
+		}
+	}
+	// nothing to be done for teardown here
+	return func() {}
 }
