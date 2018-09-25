@@ -138,7 +138,7 @@ func (e *edsStreamHandler) handle() error {
 
 		// If this isn't a request to envoy.api.v2.ClusterLoadAssignment we can't handle it and something is very wrong with envoy
 		if request.TypeUrl != claURL {
-			stats.Incr("type-url.unknown", stats.Tag{"TypeUrl", request.TypeUrl})
+			stats.Incr("type-url.unknown", stats.Tag{Name: "TypeUrl", Value: request.TypeUrl})
 			return errors.New(fmt.Sprintf("unknown TypeUrl %s", request.TypeUrl))
 		}
 
