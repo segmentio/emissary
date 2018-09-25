@@ -1,2 +1,4 @@
 vendor/*
 emissary
+examples/*/client
+examples/*/server
