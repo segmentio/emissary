@@ -9,25 +9,50 @@
 
 [[projects]]
   name = "github.com/envoyproxy/go-control-plane"
-  packages = ["envoy/api/v2","envoy/api/v2/auth","envoy/api/v2/cluster","envoy/api/v2/core","envoy/api/v2/endpoint","envoy/api/v2/listener","envoy/api/v2/route","envoy/type"]
+  packages = [
+    "envoy/api/v2",
+    "envoy/api/v2/auth",
+    "envoy/api/v2/cluster",
+    "envoy/api/v2/core",
+    "envoy/api/v2/endpoint",
+    "envoy/api/v2/listener",
+    "envoy/api/v2/route",
+    "envoy/type"
+  ]
   revision = "676016db8193d83324a507a986a78cd3642ad713"
   version = "v0.5.0"
 
 [[projects]]
   name = "github.com/gogo/googleapis"
-  packages = ["google/api","google/rpc"]
+  packages = [
+    "google/api",
+    "google/rpc"
+  ]
   revision = "8558fb44d2f1fc223118afc694129d2c2d2924d1"
   version = "v1.1.0"
 
 [[projects]]
   name = "github.com/gogo/protobuf"
-  packages = ["gogoproto","proto","protoc-gen-gogo/descriptor","sortkeys","types"]
+  packages = [
+    "gogoproto",
+    "proto",
+    "protoc-gen-gogo/descriptor",
+    "sortkeys",
+    "types"
+  ]
   revision = "636bf0302bc95575d69441b25a2603156ffdddf1"
   version = "v1.1.1"
 
 [[projects]]
   name = "github.com/golang/protobuf"
-  packages = ["proto","protoc-gen-go/descriptor","ptypes","ptypes/any","ptypes/duration","ptypes/timestamp"]
+  packages = [
+    "proto",
+    "protoc-gen-go/descriptor",
+    "ptypes",
+    "ptypes/any",
+    "ptypes/duration",
+    "ptypes/timestamp"
+  ]
   revision = "aa810b61a9c79d51363740d207bb46cf8e620ed5"
   version = "v1.2.0"
 
@@ -42,6 +67,21 @@
   packages = ["assert"]
   revision = "c2353362d570a7bfa228149c62842019201cfb71"
   version = "v1.8.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/mdlayher/genetlink"
+  packages = ["."]
+  revision = "7615bc153978352e5f20442221cf606b624e5890"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/mdlayher/netlink"
+  packages = [
+    ".",
+    "nlenc"
+  ]
+  revision = "794849f2d5bf05e15f14bbae6bca4dfc94e7595e"
 
 [[projects]]
   name = "github.com/pkg/errors"
@@ -75,14 +115,49 @@
 
 [[projects]]
   name = "github.com/segmentio/objconv"
-  packages = [".","adapters","adapters/net","adapters/net/mail","adapters/net/url","json","objutil","yaml"]
+  packages = [
+    ".",
+    "adapters",
+    "adapters/net",
+    "adapters/net/mail",
+    "adapters/net/url",
+    "json",
+    "objutil",
+    "yaml"
+  ]
   revision = "7a1d7b8e6f3551b30751e6b2ea6bae500883870e"
   version = "v1.0.1"
 
 [[projects]]
+  name = "github.com/segmentio/stats"
+  packages = [
+    ".",
+    "datadog",
+    "procstats",
+    "procstats/linux"
+  ]
+  revision = "03436e32c942959d29145085b80e0afc1e334f45"
+  version = "v4.1.1"
+
+[[projects]]
+  branch = "feature/tgid"
+  name = "github.com/segmentio/taskstats"
+  packages = ["."]
+  revision = "a98a7e99006d96dffd2ed5d406b0334b40a4a4b6"
+
+[[projects]]
   branch = "master"
   name = "golang.org/x/net"
-  packages = ["context","http/httpguts","http2","http2/hpack","idna","internal/timeseries","trace"]
+  packages = [
+    "bpf",
+    "context",
+    "http/httpguts",
+    "http2",
+    "http2/hpack",
+    "idna",
+    "internal/timeseries",
+    "trace"
+  ]
   revision = "2f5d2388922f370f4355f327fcf4cfe9f5583908"
 
 [[projects]]
@@ -93,7 +168,22 @@
 
 [[projects]]
   name = "golang.org/x/text"
-  packages = ["collate","collate/build","internal/colltab","internal/gen","internal/tag","internal/triegen","internal/ucd","language","secure/bidirule","transform","unicode/bidi","unicode/cldr","unicode/norm","unicode/rangetable"]
+  packages = [
+    "collate",
+    "collate/build",
+    "internal/colltab",
+    "internal/gen",
+    "internal/tag",
+    "internal/triegen",
+    "internal/ucd",
+    "language",
+    "secure/bidirule",
+    "transform",
+    "unicode/bidi",
+    "unicode/cldr",
+    "unicode/norm",
+    "unicode/rangetable"
+  ]
   revision = "f21a4dfb5e38f5895301dc265a8def02365cc3d0"
   version = "v0.3.0"
 
@@ -105,13 +195,43 @@
 
 [[projects]]
   name = "google.golang.org/grpc"
-  packages = [".","balancer","balancer/base","balancer/roundrobin","codes","connectivity","credentials","encoding","encoding/proto","grpclog","internal","internal/backoff","internal/channelz","internal/envconfig","internal/grpcrand","internal/transport","keepalive","metadata","naming","peer","resolver","resolver/dns","resolver/passthrough","stats","status","tap"]
+  packages = [
+    ".",
+    "balancer",
+    "balancer/base",
+    "balancer/roundrobin",
+    "codes",
+    "connectivity",
+    "credentials",
+    "encoding",
+    "encoding/proto",
+    "grpclog",
+    "internal",
+    "internal/backoff",
+    "internal/channelz",
+    "internal/envconfig",
+    "internal/grpcrand",
+    "internal/transport",
+    "keepalive",
+    "metadata",
+    "naming",
+    "peer",
+    "resolver",
+    "resolver/dns",
+    "resolver/passthrough",
+    "stats",
+    "status",
+    "tap"
+  ]
   revision = "8dea3dc473e90c8179e519d91302d0597c0ca1d1"
   version = "v1.15.0"
 
 [[projects]]
   name = "gopkg.in/go-playground/mold.v2"
-  packages = [".","modifiers"]
+  packages = [
+    ".",
+    "modifiers"
+  ]
   revision = "6bc20ce40733e8e04c2fda4523a957dd8e198948"
   version = "v2.2.0"
 
@@ -130,6 +250,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "14b232c9e4f502ff62514dde9464a109ac6832b23d15c7a6245daaa4b869946d"
+  inputs-digest = "4113cac93513d430e57ac186b390c050b3e8b9dba547a4eb33c5e3efa1427a67"
   solver-name = "gps-cdcl"
   solver-version = 1
