@@ -1,3 +1,6 @@
 FROM scratch
+
 COPY ./emissary /emissary
-CMD [ "/emissary", "eds", "-consul", "consul:8500" ]
+
+ENTRYPOINT ["/emissary"]
+CMD [ "eds", "-consul", "consul:8500" ]
