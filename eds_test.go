@@ -16,7 +16,8 @@ import (
 
 	"errors"
 
-	"github.com/apex/log"
+	"fmt"
+
 	xds "github.com/envoyproxy/go-control-plane/envoy/api/v2"
 	envoycore "github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
 	"github.com/magiconair/properties/assert"
@@ -38,7 +39,6 @@ type mockEndpointServer struct {
 }
 
 func (m *mockEndpointServer) Send(response *xds.DiscoveryResponse) error {
-	log.Infof("Got response +%v", response)
 	m.lastResponse = response
 	if m.responseHandler != nil {
 		m.responseHandler(m.t, response)
@@ -183,7 +183,7 @@ func TestEndpointsNotEqual(t *testing.T) {
 			e2: consul.Endpoint{
 				ID:   "one",
 				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "bar",
+				Node: "foo",
 				Tags: make([]string, 0),
 				Meta: nil,
 				RTT:  time.Millisecond * 200,
@@ -203,7 +203,7 @@ func TestEndpointsNotEqual(t *testing.T) {
 			e2: consul.Endpoint{
 				ID:   "one",
 				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "bar",
+				Node: "foo",
 				Tags: []string{"foo "},
 				Meta: nil,
 				RTT:  time.Millisecond * 200,
@@ -223,7 +223,7 @@ func TestEndpointsNotEqual(t *testing.T) {
 			e2: consul.Endpoint{
 				ID:   "one",
 				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "bar",
+				Node: "foo",
 				Tags: []string{"foo "},
 				Meta: map[string]string{"foo": "bar"},
 				RTT:  time.Millisecond * 200,
@@ -243,7 +243,7 @@ func TestEndpointsNotEqual(t *testing.T) {
 			e2: consul.Endpoint{
 				ID:   "one",
 				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "bar",
+				Node: "foo",
 				Tags: []string{"foo "},
 				Meta: map[string]string{"foo": "baz"},
 				RTT:  time.Millisecond * 200,
@@ -263,7 +263,7 @@ func TestEndpointsNotEqual(t *testing.T) {
 			e2: consul.Endpoint{
 				ID:   "one",
 				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "bar",
+				Node: "foo",
 				Tags: []string{"foo "},
 				Meta: map[string]string{"foo": "bar"},
 				RTT:  time.Millisecond * 200,
@@ -274,6 +274,128 @@ func TestEndpointsNotEqual(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, compare(tt.e1, tt.e2), false, "expected endpoints to be not equal")
+		})
+	}
+}
+
+func TestEndpointsEqual(t *testing.T) {
+	var tests = []struct {
+		name string
+		e1   consul.Endpoint
+		e2   consul.Endpoint
+	}{
+		{
+			name: "same data",
+			e1: consul.Endpoint{
+				ID:   "one",
+				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
+				Node: "foo",
+				Tags: make([]string, 0),
+				Meta: nil,
+				RTT:  time.Millisecond * 200,
+			},
+
+			e2: consul.Endpoint{
+				ID:   "one",
+				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
+				Node: "foo",
+				Tags: make([]string, 0),
+				Meta: nil,
+				RTT:  time.Millisecond * 200,
+			},
+		},
+		{
+			name: "same data with tags",
+			e1: consul.Endpoint{
+				ID:   "one",
+				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
+				Node: "foo",
+				Tags: []string{"test"},
+				Meta: nil,
+				RTT:  time.Millisecond * 200,
+			},
+
+			e2: consul.Endpoint{
+				ID:   "one",
+				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
+				Node: "foo",
+				Tags: []string{"test"},
+				Meta: nil,
+				RTT:  time.Millisecond * 200,
+			},
+		},
+		{
+			name: "same data tags diff order",
+			e1: consul.Endpoint{
+				ID:   "one",
+				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
+				Node: "foo",
+				Tags: []string{"test", "one"},
+				Meta: nil,
+				RTT:  time.Millisecond * 200,
+			},
+
+			e2: consul.Endpoint{
+				ID:   "one",
+				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
+				Node: "foo",
+				Tags: []string{"one", "test"},
+				Meta: nil,
+				RTT:  time.Millisecond * 200,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, compare(tt.e1, tt.e2), true, "expected endpoints to be equal")
+		})
+	}
+}
+
+func TestHasChanged(t *testing.T) {
+	var tests = []struct {
+		name     string
+		expected bool
+		last     map[string][]consul.Endpoint
+		new      map[string][]consul.Endpoint
+	}{
+		{
+			name:     "empty",
+			expected: false,
+		},
+		{
+			name:     "new empty",
+			expected: false,
+			new:      make(map[string][]consul.Endpoint),
+		},
+		{
+			name:     "empty add new",
+			expected: true,
+			new: map[string][]consul.Endpoint{
+				"foo": {{ID: "test"}},
+			},
+		},
+		{
+			name:     "same",
+			expected: false,
+			last: map[string][]consul.Endpoint{
+				"foo": {{ID: "test"}},
+			},
+			new: map[string][]consul.Endpoint{
+				"foo": {{ID: "test"}},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			esh := &edsStreamHandler{}
+			if tt.last != nil {
+				esh.lastEndpoints = tt.last
+			}
+
+			assert.Equal(t, esh.hasChanged(tt.new), tt.expected, fmt.Sprintf("expected  %v", tt.expected))
 		})
 	}
 }
@@ -305,6 +427,19 @@ func TestStreamEndpointsUnknownUrl(t *testing.T) {
 	m := &mockEndpointServer{typeUrl: "foo"}
 	err := eds.StreamEndpoints(m)
 	assert.Equal(t, err.Error(), "unknown TypeUrl foo", "expected unknown TypeUrl")
+}
+
+func TestBuildAzMap(t *testing.T) {
+	e := []consul.Endpoint{{ID: "test"}}
+	m := buildAzMap(e)
+	assert.Equal(t, len(m), 1, "expected map len of 1")
+	assert.Equal(t, m["none"][0].ID, "test", "expected ID of test")
+
+	e = []consul.Endpoint{{ID: "test", Tags: []string{"az=us-east-1a"}}, {ID: "test", Tags: []string{"az=us-east-1c"}}}
+	m = buildAzMap(e)
+	assert.Equal(t, len(m), 2, "expected map len of 2")
+	assert.Equal(t, m["us-east-1a"][0].ID, "test", "expected ID of test")
+	assert.Equal(t, m["us-east-1c"][0].ID, "test", "expected ID of test")
 }
 
 func TestStreamEndpoints(t *testing.T) {

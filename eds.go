@@ -15,6 +15,7 @@ import (
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
 	"github.com/segmentio/consul-go"
+	"github.com/segmentio/stats"
 )
 
 var (
@@ -72,9 +73,15 @@ func WithPollInterval(rslv *consul.Resolver) EdsOpt {
 // Handle blocks keeping the gRPC connection open for bi-directional stream updates
 func (e *EdsService) StreamEndpoints(server xds.EndpointDiscoveryService_StreamEndpointsServer) error {
 	log.Debug("in stream endpoints")
-	// TODO add metric
+	stats.Incr("stream-endpoints.connections.new")
 	handler := newEdsStreamHandler(server, e)
-	return handler.handle()
+	err := handler.handle()
+	if err != nil {
+		log.Infof("error in handler %s", err.Error())
+		stats.Incr("stream-endpoints.handler.error")
+	}
+	stats.Incr("stream-endpoints.connections.closed")
+	return err
 }
 
 // An edsStreamHandler is responsible for servicing a single client on the StreamEndpoints API.
@@ -125,12 +132,13 @@ func (e *edsStreamHandler) handle() error {
 		// receive from the gRPC server, on error cancel and return
 		request, err := e.server.Recv()
 		if err != nil {
+			stats.Incr("recv.error")
 			return errors.Wrap(err, "recv")
 		}
 
 		// If this isn't a request to envoy.api.v2.ClusterLoadAssignment we can't handle it and something is very wrong with envoy
 		if request.TypeUrl != claURL {
-			log.Infof("unknown TypeUrl %s", request.TypeUrl)
+			stats.Incr("type-url.unknown")
 			return errors.New(fmt.Sprintf("unknown TypeUrl %s", request.TypeUrl))
 		}
 
@@ -155,6 +163,7 @@ func (e *edsStreamHandler) handle() error {
 						for _, cluster := range request.ResourceNames {
 							addrs, err := e.resolver.LookupService(context.Background(), cluster)
 							if err != nil {
+								stats.Incr("resolver.error")
 								log.Infof("error querying resolver %s", err)
 								cancel()
 								return
@@ -182,7 +191,9 @@ func (e *edsStreamHandler) handle() error {
 			case r := <-e.results:
 				if firstRequest || e.hasChanged(r) {
 					err := e.send(r, request.TypeUrl)
+					stats.Incr("discovery-response.sent")
 					if err != nil {
+						stats.Incr("discovery-response.sent.error")
 						return errors.Wrap(err, "error sending")
 					}
 					break Run // break out of for run loop and head back to top of handle loop to receive response from Envoy
@@ -204,7 +215,6 @@ func (e *edsStreamHandler) send(results map[string][]consul.Endpoint, url string
 	resp.VersionInfo = strconv.Itoa(e.lastVersion)
 
 	log.Debug("sending DiscoveryResponse")
-	// TODO add metricNonce:       e.lastNonce,
 	e.lastEndpoints = results
 	return e.server.Send(resp)
 }
@@ -215,7 +225,7 @@ func (e *edsStreamHandler) hasChanged(results map[string][]consul.Endpoint) bool
 	// If number of services changed in this request then we definitely have an update
 	if len(results) != len(e.lastEndpoints) {
 		log.Info("detected change in requested clusters")
-		// TODO metric here
+		stats.Incr("resource-count.changed")
 		return true
 	}
 
@@ -225,7 +235,7 @@ func (e *edsStreamHandler) hasChanged(results map[string][]consul.Endpoint) bool
 		lastEndpoints := e.lastEndpoints[service]
 		// If the length differs we have a change
 		if len(lastEndpoints) != len(endpoints) {
-			// TODO metric
+			stats.Incr("endpoints-count.changed")
 			return true
 		}
 
@@ -242,12 +252,13 @@ func (e *edsStreamHandler) hasChanged(results map[string][]consul.Endpoint) bool
 		// at the same index if they are not equal we have a change.
 		for i, v := range endpoints {
 			if !compare(lastEndpoints[i], v) {
-				// TODO metric
+				stats.Incr("endpoints.changed")
 				return true
 			}
 		}
 	}
 
+	stats.Incr("endpoints.unchanged")
 	// No changes detected
 	return false
 }
@@ -265,7 +276,7 @@ func buildDiscoveryResponse(results map[string][]consul.Endpoint, url string) (*
 				a := strings.Split(addr.Addr.String(), ":")
 				port, err := strconv.Atoi(a[1])
 				if err != nil {
-					// TODO Add metric
+					stats.Incr("endpoint.parse.error")
 					log.Infof("error parsing endpoint")
 					// Rather than fail here attempt to return some results
 					// if possible rather than exiting

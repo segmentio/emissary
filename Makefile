@@ -30,6 +30,10 @@ fmtfix:
 test:
 	$Qgo test $(GOTESTFLAGS)
 
+.PHONY: cover
+cover:
+	$Qgo test -coverprofile cover.out
+
 PHONY: build clean
 build:
 	$QCGO_ENABLED=0 go build ./cmd/emissary

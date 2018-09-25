@@ -2,3 +2,4 @@ vendor/*
 emissary
 examples/*/client
 examples/*/server
+cover.out
