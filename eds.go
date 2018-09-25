@@ -69,7 +69,7 @@ func WithPollInterval(rslv *consul.Resolver) EdsOpt {
 
 // Implementation of the Envoy xDS gRPC Streaming Endpoint for EndpointDiscovery. When we receive
 // a new gRPC request create an EdsStreamHandler and call the handle func.
-// Handle blocks keeping the gRPC connection open for bi-directionally stream updates
+// Handle blocks keeping the gRPC connection open for bi-directional stream updates
 func (e *EdsService) StreamEndpoints(server xds.EndpointDiscoveryService_StreamEndpointsServer) error {
 	log.Debug("in stream endpoints")
 	// TODO add metric
@@ -125,8 +125,7 @@ func (e *edsStreamHandler) handle() error {
 		// receive from the gRPC server, on error cancel and return
 		request, err := e.server.Recv()
 		if err != nil {
-			log.Infof("error in Recv %s", err)
-			return err
+			return errors.Wrap(err, "recv")
 		}
 
 		// If this isn't a request to envoy.api.v2.ClusterLoadAssignment we can't handle it and something is very wrong with envoy
@@ -184,8 +183,7 @@ func (e *edsStreamHandler) handle() error {
 				if firstRequest || e.hasChanged(r) {
 					err := e.send(r, request.TypeUrl)
 					if err != nil {
-						log.Infof("error sending %s", err)
-						return err
+						return errors.Wrap(err, "error sending")
 					}
 					break Run // break out of for run loop and head back to top of handle loop to receive response from Envoy
 				}
@@ -401,21 +399,21 @@ func compare(e1, e2 consul.Endpoint) bool {
 // have changed. One would also need to periodically clean up any resources for nodes no longer calling this endpoint.
 func (e *EdsService) FetchEndpoints(ctx context.Context, request *xds.DiscoveryRequest) (*xds.DiscoveryResponse, error) {
 	if request.TypeUrl != claURL {
-		return nil, errors.New(fmt.Sprintf("unsupported TypeUrl %s", request.TypeUrl))
+		return nil, errors.Errorf("unsupported TypeUrl %s", request.TypeUrl)
 	}
 
 	results := make(map[string][]consul.Endpoint)
 	for _, cluster := range request.ResourceNames {
 		addrs, err := e.rslv.LookupService(context.Background(), cluster)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "lookup service")
 		}
 		results[cluster] = addrs
 	}
 
 	resp, err := buildDiscoveryResponse(results, request.GetVersionInfo())
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error building DiscoveryResponse")
 	}
 
 	return resp, nil

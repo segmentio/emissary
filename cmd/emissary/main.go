@@ -63,6 +63,6 @@ func main() {
 		client := &consul.Client{Address: config.Consul}
 		eds(ctx, client, config)
 	default:
-		panic("unknown command")
+		panic("unknown command: " + cmd)
 	}
 }
