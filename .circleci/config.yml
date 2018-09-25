@@ -3,7 +3,7 @@ jobs:
   setup:
     working_directory: /go/src/github.com/segmentio/emissary
     docker:
-      - image: segment/circleci-golang:1.11
+      - image: segment/circleci-golang:1.11.0
     steps:
       - checkout
       - restore_cache:
@@ -23,7 +23,7 @@ jobs:
   build:
     working_directory: /go/src/github.com/segmentio/emissary
     docker:
-      - image: segment/circleci-golang:1.11
+      - image: segment/circleci-golang:1.11.0
     steps:
       - setup_remote_docker: { reusable: true, docker_layer_caching: true }
       - attach_workspace: { at: . }
@@ -62,7 +62,7 @@ jobs:
   publish:
     working_directory: /go/src/github.com/segmentio/emissary
     docker:
-      - image: segment/circleci-golang:1.11
+      - image: segment/circleci-golang:1.11.0
     steps:
       - setup_remote_docker: { reusable: true, docker_layer_caching: true }
       - attach_workspace: { at: . }
@@ -92,7 +92,7 @@ jobs:
   vet:
     working_directory: /go/src/github.com/segmentio/emissary
     docker:
-      - image: segment/circleci-golang:1.11
+      - image: segment/circleci-golang:1.11.0
     steps:
       - attach_workspace: { at: . }
       - run:
@@ -102,7 +102,7 @@ jobs:
   test:
     working_directory: /go/src/github.com/segmentio/emissary
     docker:
-      - image: segment/circleci-golang:1.11
+      - image: segment/circleci-golang:1.11.0
     steps:
       - attach_workspace: { at: . }
       - run:
