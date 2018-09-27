@@ -2,6 +2,8 @@
 
 emissary is a consul backed xDS for Envoy https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md
 
+![Emissary Diagram](./emissary.png?raw=true "Emissary Diagram")
+
 ## Development
 ```
 dep ensure
