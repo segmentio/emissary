@@ -27,17 +27,6 @@ services:
         aliases:
           - consul
 
-#  consul-envoy-xds:
-#    image: envoy-xds:latest
-#    expose:
-#      - "24680"
-#    ports:
-#      - "24680:24680"
-#    networks:
-#      envoymesh:
-#        aliases:
-#          - xds
-
   consul-envoy-xds:
     image: emissary:latest
     expose:
@@ -48,21 +37,6 @@ services:
       envoymesh:
         aliases:
           - xds
-
-#  sds:
-#    build:
-#      context: .
-#      dockerfile: Dockerfile-sds
-#    depends_on:
-#      - consul
-#    networks:
-#      envoymesh:
-#        aliases:
-#          - sds
-#    expose:
-#      - "8080"
-#    ports:
-#      - "8080:8080"
 
   registrator:
     image: gliderlabs/registrator:latest
