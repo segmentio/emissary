@@ -65,18 +65,19 @@ func WithResolver(rslv *consul.Resolver) EdsOpt {
 //////////////////////////////////////// gRPC SUPPORT //////////////////////////////////////////////////////////
 
 // Implementation of the Envoy xDS gRPC Streaming Endpoint for EndpointDiscovery. When we receive
-// a new gRPC request create an EdsStreamHandler and call the handle func.
+// a new gRPC request create an EdsStreamHandler and call the run func.
 // Handle blocks keeping the gRPC connection open for bi-directional stream updates
 func (e *EdsService) StreamEndpoints(server xds.EndpointDiscoveryService_StreamEndpointsServer) error {
 	log.Debug("in stream endpoints")
 	stats.Incr("stream-endpoints.connections.new")
-	handler := newEdsStreamHandler(server, e)
-	err := handler.handle()
+	handler := newEdsStreamHandler()
+	err := handler.run(e.ctx, server, e.consulEndpointPoller)
 	if err != nil {
 		log.Infof("error in handler %s", err)
 		stats.Incr("stream-endpoints.handler.error")
 	}
 	stats.Incr("stream-endpoints.connections.closed")
+	e.consulEndpointPoller.removeHandler(handler)
 	return err
 }
 
