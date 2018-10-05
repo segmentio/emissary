@@ -1,87 +1,20 @@
 package emissary
 
-// We're testing the internal util methods in eds_grpc so using
+// We're testing the internal util methods in eds so using
 // the emissary rather than emissary_test package
 import (
-	"context"
-	"encoding/json"
 	"net"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
-	"reflect"
 	"strconv"
 	"testing"
 	"time"
 
-	"errors"
-
-	"fmt"
+	"context"
 
 	xds "github.com/envoyproxy/go-control-plane/envoy/api/v2"
 	envoycore "github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
 	"github.com/magiconair/properties/assert"
 	"github.com/segmentio/consul-go"
-	"google.golang.org/grpc/metadata"
 )
-
-type serviceAddr string
-
-func (serviceAddr) Network() string  { return "" }
-func (a serviceAddr) String() string { return string(a) }
-
-type mockEndpointServer struct {
-	t               *testing.T
-	typeUrl         string
-	resourceNames   []string
-	lastResponse    *xds.DiscoveryResponse
-	responseHandler func(t *testing.T, response *xds.DiscoveryResponse)
-}
-
-func (m *mockEndpointServer) Send(response *xds.DiscoveryResponse) error {
-	m.lastResponse = response
-	if m.responseHandler != nil {
-		m.responseHandler(m.t, response)
-	}
-	return nil
-}
-
-func (m *mockEndpointServer) Recv() (*xds.DiscoveryRequest, error) {
-	if m.lastResponse == nil {
-		return &xds.DiscoveryRequest{TypeUrl: m.typeUrl, ResourceNames: m.resourceNames}, nil
-	}
-
-	return &xds.DiscoveryRequest{
-		TypeUrl:       m.typeUrl,
-		ResourceNames: m.resourceNames,
-		VersionInfo:   m.lastResponse.VersionInfo,
-		ResponseNonce: m.lastResponse.Nonce,
-	}, errors.New("leaving now")
-}
-
-func (m *mockEndpointServer) SetHeader(metadata.MD) error {
-	panic("implement me")
-}
-
-func (m *mockEndpointServer) SendHeader(metadata.MD) error {
-	panic("implement me")
-}
-
-func (m *mockEndpointServer) SetTrailer(metadata.MD) {
-	panic("implement me")
-}
-
-func (m *mockEndpointServer) Context() context.Context {
-	panic("implement me")
-}
-
-func (me *mockEndpointServer) SendMsg(m interface{}) error {
-	panic("implement me")
-}
-
-func (me *mockEndpointServer) RecvMsg(m interface{}) error {
-	panic("implement me")
-}
 
 func TestEndpointsNotEqual(t *testing.T) {
 	var tests = []struct {
@@ -353,53 +286,6 @@ func TestEndpointsEqual(t *testing.T) {
 	}
 }
 
-func TestHasChanged(t *testing.T) {
-	var tests = []struct {
-		name     string
-		expected bool
-		last     map[string][]consul.Endpoint
-		new      map[string][]consul.Endpoint
-	}{
-		{
-			name:     "empty",
-			expected: false,
-		},
-		{
-			name:     "new empty",
-			expected: false,
-			new:      make(map[string][]consul.Endpoint),
-		},
-		{
-			name:     "empty add new",
-			expected: true,
-			new: map[string][]consul.Endpoint{
-				"foo": {{ID: "test"}},
-			},
-		},
-		{
-			name:     "same",
-			expected: false,
-			last: map[string][]consul.Endpoint{
-				"foo": {{ID: "test"}},
-			},
-			new: map[string][]consul.Endpoint{
-				"foo": {{ID: "test"}},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			esh := &edsStreamHandler{}
-			if tt.last != nil {
-				esh.lastEndpoints = tt.last
-			}
-
-			assert.Equal(t, esh.hasChanged(tt.new), tt.expected, fmt.Sprintf("expected  %v", tt.expected))
-		})
-	}
-}
-
 func TestHasAZ(t *testing.T) {
 	tags := []string{"foo", "az=us-west-1a", ""}
 	az, ok := hasAz(tags)
@@ -413,7 +299,16 @@ func TestHasAZ(t *testing.T) {
 }
 
 func TestStreamEndpointsUnknownUrl(t *testing.T) {
-	server, client := newServer(t)
+	s := []struct {
+		Service service
+	}{
+		{Service: service{Address: "192.168.0.1", Port: 4242}},
+		{Service: service{Address: "192.168.0.2", Port: 4242}},
+		{Service: service{Address: "192.168.0.3", Port: 4242}},
+	}
+	ss := make([][]struct{ Service service }, 1)
+	ss[0] = s
+	server, client := newServer(t, ss)
 	defer server.Close()
 
 	rslv := consul.Resolver{
@@ -423,7 +318,7 @@ func TestStreamEndpointsUnknownUrl(t *testing.T) {
 		OnlyPassing: true,
 		Cache:       nil,
 	}
-	eds := NewEdsService(nil, WithResolver(&rslv))
+	eds := NewEdsService(context.Background(), nil, WithResolver(&rslv))
 	m := &mockEndpointServer{typeUrl: "foo"}
 	err := eds.StreamEndpoints(m)
 	assert.Equal(t, err.Error(), "unknown TypeUrl foo", "expected unknown TypeUrl")
@@ -443,7 +338,16 @@ func TestBuildAzMap(t *testing.T) {
 }
 
 func TestStreamEndpoints(t *testing.T) {
-	server, client := newServer(t)
+	s := []struct {
+		Service service
+	}{
+		{Service: service{Address: "192.168.0.1", Port: 4242}},
+		{Service: service{Address: "192.168.0.2", Port: 4242}},
+		{Service: service{Address: "192.168.0.3", Port: 4242}},
+	}
+	ss := make([][]struct{ Service service }, 1)
+	ss[0] = s
+	server, client := newServer(t, ss)
 	defer server.Close()
 
 	rslv := consul.Resolver{
@@ -453,7 +357,7 @@ func TestStreamEndpoints(t *testing.T) {
 		OnlyPassing: true,
 		Cache:       nil,
 	}
-	eds := NewEdsService(nil, WithResolver(&rslv))
+	eds := NewEdsService(context.Background(), nil, WithResolver(&rslv))
 	m := &mockEndpointServer{typeUrl: "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment",
 		resourceNames: []string{"1234"},
 		t:             t,
@@ -491,53 +395,4 @@ func TestStreamEndpoints(t *testing.T) {
 		},
 	}
 	eds.StreamEndpoints(m)
-}
-
-func newServerClient(handler func(http.ResponseWriter, *http.Request)) (server *httptest.Server, client *consul.Client) {
-	server = httptest.NewServer(http.HandlerFunc(handler))
-	client = &consul.Client{
-		Address:    server.URL,
-		UserAgent:  "test",
-		Datacenter: "dc1",
-	}
-	return
-}
-
-func newServer(t *testing.T) (server *httptest.Server, client *consul.Client) {
-	return newServerClient(func(res http.ResponseWriter, req *http.Request) {
-		if req.Method != "GET" {
-			t.Error("bad method:", req.Method)
-		}
-
-		if req.URL.Path != "/v1/health/service/1234" {
-			t.Error("bad URL path:", req.URL.Path)
-		}
-
-		foundQuery := req.URL.Query()
-		expectQuery := url.Values{
-			"passing":   {""},
-			"stale":     {""},
-			"dc":        {"dc1"},
-			"tag":       {"A", "B", "C"},
-			"node-meta": {"answer:42"},
-		}
-		if !reflect.DeepEqual(foundQuery, expectQuery) {
-			t.Error("bad URL query:")
-			t.Logf("expected: %#v", expectQuery)
-			t.Logf("found:    %#v", foundQuery)
-		}
-
-		type service struct {
-			Address string
-			Port    int
-		}
-		json.NewEncoder(res).Encode([]struct {
-			Service service
-		}{
-			{Service: service{Address: "192.168.0.1", Port: 4242}},
-			{Service: service{Address: "192.168.0.2", Port: 4242}},
-			{Service: service{Address: "192.168.0.3", Port: 4242}},
-		})
-		return
-	})
 }
