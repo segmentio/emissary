@@ -81,35 +81,104 @@ func (e *EdsService) StreamEndpoints(server xds.EndpointDiscoveryService_StreamE
 	return err
 }
 
+////////////////////////////////////////// REST ENDPOINT //////////////////////////////////////////////////////////
 
+// FetchEndpoints queries consul to retrieve the latest service endpoint information and returns a DiscoveryResponse and error.
+// NOTE: Unlike StreamEndpoints no state is retained on the server to determine if the service endpoints have changed
+// therefore every time Envoy queries this endpoint it will receive the latest endpoint information in a DiscoveryResponse.
+// Per the xDS protocol spec https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md#rest-json-polling-subscriptions
+// be careful to not set your polling interval too low or Envoy and this service will spin on this endpoint.
+//
+// Adding support for only sending a DiscoveryResponse when the underlying endpoints has changed could be added by retaining
+// a map[request.Node][map[string][consul.Endpoint] and only only returning a new DiscoveryResponse when the underlying resources
+// have changed. One would also need to periodically clean up any resources for nodes no longer calling this endpoint.
+func (e *EdsService) FetchEndpoints(ctx context.Context, request *xds.DiscoveryRequest) (*xds.DiscoveryResponse, error) {
+	if request.TypeUrl != claURL {
+		return nil, errors.Errorf("unsupported TypeUrl %s", request.TypeUrl)
 	}
 
+	results := make([]consulEdsResult, len(request.ResourceNames))
+	for _, cluster := range request.ResourceNames {
+		endpoints, err := e.rslv.LookupService(context.Background(), cluster)
 		if err != nil {
+			return nil, errors.Wrap(err, "lookup service")
 		}
-
+		results = append(results, consulEdsResult{service: cluster, endpoints: endpoints})
 	}
 
+	clas := make([]*xds.ClusterLoadAssignment, len(results))
+	for _, result := range results {
+		clas = append(clas, buildClusterLoadAssignment(result))
+	}
+
+	resp, err := buildDiscoveryResponse(request.TypeUrl, clas...)
 	if err != nil {
+		return nil, errors.Wrap(err, "error building DiscoveryResponse")
 	}
 
+	return resp, nil
 }
 
+// Takes a variadic number of ClusterLoadAssignments and generates a DiscoveryResponse
+func buildDiscoveryResponse(url string, clas ...*xds.ClusterLoadAssignment) (*xds.DiscoveryResponse, error) {
+	var as []ptypes.Any
+	for _, cla := range clas {
+		a, err := ptypes.MarshalAny(cla)
+		if err != nil {
+			return nil, err
 		}
 
+		as = append(as, *a)
 	}
 
+	return &xds.DiscoveryResponse{
+		Resources: as,
+		TypeUrl:   url,
+	}, nil
 }
 
+// Converts a consulEdsResult (list of healthy endpoints for a service in consul) to a ClusterLoadAssignment,
+// which is a protobuf generated payload the envoy client expects over grpc.
+func buildClusterLoadAssignment(results consulEdsResult) *xds.ClusterLoadAssignment {
+	cla := &xds.ClusterLoadAssignment{
+		ClusterName: results.service,
+	}
 
+	azMap := buildAzMap(results.endpoints)
+	for az, endpoints := range azMap {
+		for _, addr := range endpoints {
+			a := strings.Split(addr.Addr.String(), ":")
+			port, err := strconv.Atoi(a[1])
+			if err != nil {
+				stats.Incr("endpoint.parse.error")
+				log.Infof("error parsing endpoint")
+				// Rather than fail here attempt to return some results
+				// if possible rather than exiting
+				continue
+			}
+			ee := envoyendpoint.LocalityLbEndpoints{
+				Locality: &envoycore.Locality{Zone: az},
+				LbEndpoints: []envoyendpoint.LbEndpoint{{
+					Endpoint: &envoyendpoint.Endpoint{
+						Address: &envoycore.Address{
+							Address: &envoycore.Address_SocketAddress{
+								SocketAddress: &envoycore.SocketAddress{
+									Address: a[0],
+									PortSpecifier: &envoycore.SocketAddress_PortValue{
+										PortValue: uint32(port),
 									},
 								},
 							},
 						},
 					},
+				},
+				},
 			}
+			cla.Endpoints = append(cla.Endpoints, ee)
 		}
 	}
 
+	return cla
 }
 
 //////////////////////////////// SHARED UTIL FUNCTIONS ///////////////////////////////////////////////
@@ -189,37 +258,4 @@ func compare(e1, e2 consul.Endpoint) bool {
 	}
 
 	return true
-}
-
-////////////////////////////////////////// REST ENDPOINT //////////////////////////////////////////////////////////
-
-// FetchEndpoints queries consul to retrieve the latest service endpoint information and returns a DiscoveryResponse and error.
-// NOTE: Unlike StreamEndpoints no state is retained on the server to determine if the service endpoints have changed
-// therefore every time Envoy queries this endpoint it will receive the latest endpoint information in a DiscoveryResponse.
-// Per the xDS protocol spec https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md#rest-json-polling-subscriptions
-// be careful to not set your polling interval too low or Envoy and this service will spin on this endpoint.
-//
-// Adding support for only sending a DiscoveryResponse when the underlying endpoints has changed could be added by retaining
-// a map[request.Node][map[string][consul.Endpoint] and only only returning a new DiscoveryResponse when the underlying resources
-// have changed. One would also need to periodically clean up any resources for nodes no longer calling this endpoint.
-func (e *EdsService) FetchEndpoints(ctx context.Context, request *xds.DiscoveryRequest) (*xds.DiscoveryResponse, error) {
-	if request.TypeUrl != claURL {
-		return nil, errors.Errorf("unsupported TypeUrl %s", request.TypeUrl)
-	}
-
-	results := make(map[string][]consul.Endpoint)
-	for _, cluster := range request.ResourceNames {
-		addrs, err := e.rslv.LookupService(context.Background(), cluster)
-		if err != nil {
-			return nil, errors.Wrap(err, "lookup service")
-		}
-		results[cluster] = addrs
-	}
-
-	resp, err := buildDiscoveryResponse(results, request.GetVersionInfo())
-	if err != nil {
-		return nil, errors.Wrap(err, "error building DiscoveryResponse")
-	}
-
-	return resp, nil
 }
