@@ -2,7 +2,6 @@ package emissary
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -13,8 +12,8 @@ import (
 	envoycore "github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
 	envoyendpoint "github.com/envoyproxy/go-control-plane/envoy/api/v2/endpoint"
 	ptypes "github.com/gogo/protobuf/types"
-	"github.com/pkg/errors"
 	"github.com/segmentio/consul-go"
+	"github.com/segmentio/errors-go"
 	"github.com/segmentio/stats"
 )
 
@@ -24,9 +23,9 @@ var (
 
 // EdsService implements the Envoy xDS EndpointDiscovery service
 type EdsService struct {
-	consulClient       *consul.Client
-	consulPollInterval time.Duration
-	rslv               *consul.Resolver
+	consulEndpointPoller *consulEdsPoller // our consul poller that handles subscriptions for endpoint info from grpc clients
+	rslv                 *consul.Resolver // our consul resolver
+	ctx                  context.Context  // our root context
 }
 
 // TracerOpt configures a Tracer
@@ -34,14 +33,16 @@ type EdsOpt func(t *EdsService)
 
 // Create a new EDS service using consulAddr for fetching
 // consul service discovery data
-func NewEdsService(client *consul.Client, opts ...EdsOpt) *EdsService {
-	return NewEdsServiceWithPollInterval(client, time.Second, opts...)
+func NewEdsService(ctx context.Context, client *consul.Client, opts ...EdsOpt) *EdsService {
+	return NewEdsServiceWithPollInterval(ctx, client, time.Second, opts...)
 }
 
-// Create a new EDS service using consulAddr for fetching
-// consul service discovery data
-func NewEdsServiceWithPollInterval(client *consul.Client, consulPollInterval time.Duration, opts ...EdsOpt) *EdsService {
-	eds := &EdsService{consulClient: client, consulPollInterval: consulPollInterval}
+// Create a new EDS service using consul client to fetch consul service endpoints
+func NewEdsServiceWithPollInterval(ctx context.Context, client *consul.Client, consulPollInterval time.Duration, opts ...EdsOpt) *EdsService {
+	rslv := consul.Resolver{Client: client}
+	poller := newConsulEdsPoller(&rslv, time.NewTicker(consulPollInterval))
+	eds := &EdsService{consulEndpointPoller: poller, rslv: &rslv, ctx: ctx}
+
 	for _, opt := range opts {
 		if opt == nil {
 			continue
@@ -49,6 +50,7 @@ func NewEdsServiceWithPollInterval(client *consul.Client, consulPollInterval tim
 		opt(eds)
 	}
 
+	poller.pulse(ctx)
 	return eds
 }
 
@@ -56,13 +58,7 @@ func NewEdsServiceWithPollInterval(client *consul.Client, consulPollInterval tim
 func WithResolver(rslv *consul.Resolver) EdsOpt {
 	return func(e *EdsService) {
 		e.rslv = rslv
-	}
-}
-
-// Sets the consul-go resolver poll interval
-func WithPollInterval(rslv *consul.Resolver) EdsOpt {
-	return func(e *EdsService) {
-		e.rslv = rslv
+		e.consulEndpointPoller.resolver = rslv
 	}
 }
 
