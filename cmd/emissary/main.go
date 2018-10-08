@@ -47,7 +47,7 @@ func eds(ctx context.Context, client *consul.Client, config *emissaryConfig) {
 	}
 
 	grpcServer := grpc.NewServer()
-	xds.RegisterEndpointDiscoveryServiceServer(grpcServer, emissary.NewEdsService(client))
+	xds.RegisterEndpointDiscoveryServiceServer(grpcServer, emissary.NewEdsService(ctx, client))
 	log.Infof("starting emissary EndpointDiscoveryService service on port: %d", config.Port)
 	grpcServer.Serve(lis)
 }
