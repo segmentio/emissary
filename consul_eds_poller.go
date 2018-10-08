@@ -85,32 +85,36 @@ func (c *consulEdsPoller) pulse(ctx context.Context) {
 				log.Info("received done in consulEdsPoller, exiting pulse")
 				return
 			case <-c.ticker.C:
-				// Fetch endpoints from consul for all services we're interested in.
+				// Make a copy of the services in the subscription map
 				c.mutex.RLock()
-				results := make(map[string][]consul.Endpoint)
-				for service, handlerMap := range c.subscriptions {
-					stats.Set("eds-poller.subscriptions.count", len(handlerMap), stats.Tag{Name: "service", Value: service})
+				services := make([]string, 0, len(c.subscriptions))
+				for service := range c.subscriptions {
+					services = append(services, service)
+				}
+				c.mutex.RUnlock()
+
+				// Fetch endpoints from consul for all services we're interested in.
+				for _, service := range services {
+					handlers := c.get(service)
+					stats.Set("eds-poller.subscriptions.count", len(handlers), stats.Tag{Name: "service", Value: service})
 					endpoints, err := c.resolver.LookupService(ctx, service)
 					if err != nil {
 						stats.Incr("resolver.error", stats.Tag{Name: "service", Value: service})
 						log.Infof("error querying resolver %s", err)
 					}
-					results[service] = endpoints
 
-					// Make a new slice and copy out the handlers interested in this service
-					handlers := make([]consulResultHandler, 0, len(handlerMap))
-					for k := range handlerMap {
-						handlers = append(handlers, k)
-					}
-
+					wg := &sync.WaitGroup{}
+					wg.Add(len(handlers))
 					// send the results to each of the handlers
 					for _, h := range handlers {
 						go func(h consulResultHandler) {
-							h.handle(consulEdsResult{service: service, endpoints: endpoints})
+							h.handle(wg, consulEdsResult{service: service, endpoints: endpoints})
 						}(h)
 					}
+
+					log.Infof("waiting for consulResultHandlers on %s", service)
+					wg.Wait()
 				}
-				c.mutex.RUnlock()
 			}
 		}
 	}()

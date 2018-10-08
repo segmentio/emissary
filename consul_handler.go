@@ -1,5 +1,7 @@
 package emissary
 
+import "sync"
+
 type consulResultHandler interface {
-	handle(result consulEdsResult)
+	handle(wg *sync.WaitGroup, result consulEdsResult)
 }
