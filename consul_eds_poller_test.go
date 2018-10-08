@@ -141,7 +141,6 @@ type mockEdsStreamHandler struct {
 	results chan consulEdsResult
 }
 
-func (m *mockEdsStreamHandler) handle(wg *sync.WaitGroup, result consulEdsResult) {
+func (m *mockEdsStreamHandler) handle(result consulEdsResult) {
 	m.results <- result
-	wg.Done()
 }

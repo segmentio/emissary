@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"sync"
-
 	"github.com/apex/log"
 	xds "github.com/envoyproxy/go-control-plane/envoy/api/v2"
 	"github.com/segmentio/consul-go"
@@ -127,13 +125,11 @@ func (e *edsStreamHandler) updateResources(poller *consulEdsPoller, request *xds
 // Here we're implementing the consulResultHandler interface. This function acts as a simple shim to allow
 // us to receive a consulEdsResult from some external source. The select ensures we'll either successfully send
 // the update to the edsStreamHandler or return if the edsStreamHandler has exited before we could furnish our results.
-func (e *edsStreamHandler) handle(wg *sync.WaitGroup, result consulEdsResult) {
+func (e *edsStreamHandler) handle(result consulEdsResult) {
 	select {
 	case <-e.ctx.Done():
 	case e.results <- result:
 	}
-
-	wg.Done()
 }
 
 // Send takes the healthy endpoints we received from consul in a consulEdsResult and constructs a

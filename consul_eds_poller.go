@@ -108,7 +108,8 @@ func (c *consulEdsPoller) pulse(ctx context.Context) {
 					// send the results to each of the handlers
 					for _, h := range handlers {
 						go func(h consulResultHandler) {
-							h.handle(wg, consulEdsResult{service: service, endpoints: endpoints})
+							defer wg.Done()
+							h.handle(consulEdsResult{service: service, endpoints: endpoints})
 						}(h)
 					}
 
