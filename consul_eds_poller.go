@@ -11,10 +11,10 @@ import (
 )
 
 type consulEdsPoller struct {
-	subscriptions map[string]map[consulResultHandler]bool // Service to query in consul and set of interested handlers
-	resolver      *consul.Resolver                        // our consul-go resolver
-	ticker        *time.Ticker                            // Ticker for when to poll consul, useful to mock for testing
-	mutex         sync.RWMutex                            // RW local for mutating our subscriptions
+	subscriptions map[string]map[consulResultHandler]struct{} // Service to query in consul and set of interested handlers
+	resolver      *consul.Resolver                            // our consul-go resolver
+	ticker        *time.Ticker                                // Ticker for when to poll consul, useful to mock for testing
+	mutex         sync.RWMutex                                // RW local for mutating our subscriptions
 }
 
 type consulEdsResult struct {
@@ -23,10 +23,10 @@ type consulEdsResult struct {
 }
 
 func newConsulEdsPoller(resolver *consul.Resolver, ticker *time.Ticker) *consulEdsPoller {
-	return &consulEdsPoller{subscriptions: make(map[string]map[consulResultHandler]bool),
-		resolver: resolver,
-		ticker:   ticker,
-		mutex:    sync.RWMutex{},
+	return &consulEdsPoller{
+		subscriptions: make(map[string]map[consulResultHandler]struct{}),
+		resolver:      resolver,
+		ticker:        ticker,
 	}
 }
 
@@ -34,9 +34,9 @@ func (c *consulEdsPoller) add(service string, handler consulResultHandler) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	if c.subscriptions[service] == nil {
-		c.subscriptions[service] = make(map[consulResultHandler]bool)
+		c.subscriptions[service] = make(map[consulResultHandler]struct{})
 	}
-	c.subscriptions[service][handler] = true
+	c.subscriptions[service][handler] = struct{}{}
 }
 
 func (c *consulEdsPoller) removeSubscription(service string, handler consulResultHandler) {

@@ -113,7 +113,7 @@ func TestPulse(t *testing.T) {
 	ch := make(chan time.Time)
 	tr := &time.Ticker{C: ch}
 
-	cep := consulEdsPoller{subscriptions: make(map[string]map[consulResultHandler]bool),
+	cep := consulEdsPoller{subscriptions: make(map[string]map[consulResultHandler]struct{}),
 		resolver: &r,
 		ticker:   tr,
 		mutex:    sync.RWMutex{},
