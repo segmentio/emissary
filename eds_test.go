@@ -337,6 +337,13 @@ func TestBuildAzMap(t *testing.T) {
 	assert.Equal(t, m["us-east-1c"][0].ID, "test", "expected ID of test")
 }
 
+func TestIgnoresRegionOnlyAz(t *testing.T) {
+	e := []consul.Endpoint{{ID: "test", Tags: []string{"us-east-1", "us-east-1c"}}}
+	m := buildAzMap(e)
+	assert.Equal(t, len(m), 1, "expected map len of 1")
+	assert.Equal(t, m["us-east-1c"][0].ID, "test", "expected ID of test")
+}
+
 func TestStreamEndpoints(t *testing.T) {
 	s := []struct {
 		Service service
