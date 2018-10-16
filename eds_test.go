@@ -287,7 +287,7 @@ func TestEndpointsEqual(t *testing.T) {
 }
 
 func TestHasAZ(t *testing.T) {
-	tags := []string{"foo", "az=us-west-1a", ""}
+	tags := []string{"foo", "us-west-1a", ""}
 	az, ok := hasAz(tags)
 	assert.Equal(t, ok, true, "expected az to be found")
 	assert.Equal(t, az, "us-west-1a")
@@ -330,7 +330,7 @@ func TestBuildAzMap(t *testing.T) {
 	assert.Equal(t, len(m), 1, "expected map len of 1")
 	assert.Equal(t, m["none"][0].ID, "test", "expected ID of test")
 
-	e = []consul.Endpoint{{ID: "test", Tags: []string{"az=us-east-1a"}}, {ID: "test", Tags: []string{"az=us-east-1c"}}}
+	e = []consul.Endpoint{{ID: "test", Tags: []string{"us-east-1a"}}, {ID: "test", Tags: []string{"us-east-1c"}}}
 	m = buildAzMap(e)
 	assert.Equal(t, len(m), 2, "expected map len of 2")
 	assert.Equal(t, m["us-east-1a"][0].ID, "test", "expected ID of test")
