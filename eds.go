@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"regexp"
+
 	"github.com/apex/log"
 	xds "github.com/envoyproxy/go-control-plane/envoy/api/v2"
 	envoycore "github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
@@ -201,7 +203,8 @@ func buildAzMap(endoints []consul.Endpoint) map[string][]consul.Endpoint {
 // If so return the az and true, otherwise return empty string and false
 func hasAz(tags []string) (string, bool) {
 	for _, t := range tags {
-		if strings.HasPrefix(t, "us-") {
+		match, _ := regexp.MatchString("us-(east|west)-[1|2][a|b|c]$", t)
+		if match {
 			return t, true
 		}
 	}
