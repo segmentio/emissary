@@ -201,8 +201,8 @@ func buildAzMap(endoints []consul.Endpoint) map[string][]consul.Endpoint {
 // If so return the az and true, otherwise return empty string and false
 func hasAz(tags []string) (string, bool) {
 	for _, t := range tags {
-		if strings.HasPrefix(t, "az=") {
-			return strings.Split(t, "=")[1], true
+		if strings.HasPrefix(t, "us-") {
+			return t, true
 		}
 	}
 
