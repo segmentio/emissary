@@ -48,9 +48,7 @@ jobs:
             image=${AWS_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/emissary
             $(aws ecr get-login --no-include-email --region ${AWS_REGION})
             docker tag emissary ${image}:${commit}
-            docker tag emissary ${image}:${branch}
             docker push ${image}:${commit}
-            docker push ${image}:${branch}
       - run:
           name: Saving Docker Image
           command: |
