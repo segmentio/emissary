@@ -253,12 +253,5 @@ func compare(e1, e2 consul.Endpoint) bool {
 		}
 	}
 
-	// Not sure if we want to actually compare this, assuming it
-	// is updated and populated correctly it would result in more changes than
-	// necessary
-	if e1.RTT != e2.RTT {
-		return false
-	}
-
 	return true
 }
