@@ -25,7 +25,7 @@ jobs:
     docker:
       - image: segment/circleci-golang:1.11.0
     steps:
-      - setup_remote_docker: { reusable: true, docker_layer_caching: true, version: 17.06.1-ce }
+      - setup_remote_docker: { reusable: true, docker_layer_caching: true, version: 18.06.1-ce }
       - attach_workspace: { at: . }
       - run:
           name: Building NetC
@@ -64,7 +64,7 @@ jobs:
     docker:
       - image: segment/circleci-golang:1.11.0
     steps:
-      - setup_remote_docker: { reusable: true, docker_layer_caching: true, version: 17.06.1-ce }
+      - setup_remote_docker: { reusable: true, docker_layer_caching: true, version: 18.06.1-ce }
       - attach_workspace: { at: . }
       - run:
           name: Publish Docker Image (stable)
