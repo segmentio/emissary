@@ -238,6 +238,26 @@ func TestEndpointsEqual(t *testing.T) {
 			},
 		},
 		{
+			name: "same data diff rtt",
+			e1: consul.Endpoint{
+				ID:   "one",
+				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
+				Node: "foo",
+				Tags: make([]string, 0),
+				Meta: nil,
+				RTT:  time.Millisecond * 200,
+			},
+
+			e2: consul.Endpoint{
+				ID:   "one",
+				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
+				Node: "foo",
+				Tags: make([]string, 0),
+				Meta: nil,
+				RTT:  time.Millisecond * 100,
+			},
+		},
+		{
 			name: "same data with tags",
 			e1: consul.Endpoint{
 				ID:   "one",
