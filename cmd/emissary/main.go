@@ -8,6 +8,9 @@ import (
 	"syscall"
 	"time"
 
+	"net/http"
+	_ "net/http/pprof"
+
 	"github.com/apex/log"
 	xds "github.com/envoyproxy/go-control-plane/envoy/api/v2"
 	"github.com/pkg/errors"
@@ -23,6 +26,7 @@ import (
 
 type emissaryConfig struct {
 	Port      int             `conf:"port"`
+	AdminPort int             `conf:"adminport"`
 	Consul    string          `conf:"consul"`
 	Dogstatsd dogstatsdConfig `conf:"dogstatsd" help:"dogstatsd Configuration"`
 }
@@ -45,6 +49,20 @@ func eds(ctx context.Context, client *consul.Client, config *emissaryConfig) {
 		log.WithError(errors.Wrap(err, "starting EndpointDiscoveryService"))
 		return
 	}
+
+	mux := http.DefaultServeMux
+	mux.HandleFunc("/internal/health", func(w http.ResponseWriter, r *http.Request) {
+		var recv string
+		err := client.Get(context.Background(), "/v1/status/leader", nil, &recv)
+		if err != nil {
+			w.WriteHeader(500)
+			return
+		}
+
+		w.WriteHeader(200)
+	})
+
+	go http.ListenAndServe(fmt.Sprintf(":%d", config.AdminPort), nil)
 
 	grpcServer := grpc.NewServer()
 	xds.RegisterEndpointDiscoveryServiceServer(grpcServer, emissary.NewEdsService(ctx, client))
@@ -72,6 +90,7 @@ func main() {
 	events.DefaultLogger.EnableDebug = false
 	config := &emissaryConfig{
 		Port:      9001,
+		AdminPort: 9002,
 		Consul:    "localhost:8500",
 		Dogstatsd: defaultDogstatsdConfig(),
 	}
