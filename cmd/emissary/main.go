@@ -58,11 +58,13 @@ func eds(ctx context.Context, client *consul.Client, config *emissaryConfig) {
 			w.WriteHeader(500)
 			return
 		}
-
-		w.WriteHeader(200)
 	})
 
-	go http.ListenAndServe(fmt.Sprintf(":%d", config.AdminPort), nil)
+	go func() {
+		if err := http.ListenAndServe(fmt.Sprintf(":%d", config.AdminPort), nil); err != nil {
+			panic(fmt.Sprintf("unable to bind to admin port %d, exiting.", config.AdminPort))
+		}
+	}()
 
 	grpcServer := grpc.NewServer()
 	xds.RegisterEndpointDiscoveryServiceServer(grpcServer, emissary.NewEdsService(ctx, client))
