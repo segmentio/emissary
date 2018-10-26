@@ -40,8 +40,7 @@ type dogstatsdConfig struct {
 // version will be set by CI using ld_flags to the git SHA on which the binary was built
 var version = "unknown"
 
-func eds(ctx context.Context, client *consul.Client, config *emissaryConfig) {
-	defer ctx.Done()
+func eds(ctx context.Context, cancel context.CancelFunc, client *consul.Client, config *emissaryConfig) {
 	defer configureDogstatsd(ctx, config.Dogstatsd, "eds")()
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", config.Port))
@@ -69,7 +68,11 @@ func eds(ctx context.Context, client *consul.Client, config *emissaryConfig) {
 	grpcServer := grpc.NewServer()
 	xds.RegisterEndpointDiscoveryServiceServer(grpcServer, emissary.NewEdsService(ctx, client))
 	log.Infof("starting emissary EndpointDiscoveryService service on port: %d", config.Port)
-	grpcServer.Serve(lis)
+	go func() {
+		err := grpcServer.Serve(lis)
+		log.Errorf("error in eds grpc server", err)
+		cancel()
+	}()
 }
 
 func main() {
@@ -100,10 +103,13 @@ func main() {
 	switch cmd, _ := conf.LoadWith(config, ld); cmd {
 	case "eds":
 		client := &consul.Client{Address: config.Consul}
-		eds(ctx, client, config)
+		eds(ctx, cancel, client, config)
 	default:
 		panic("unknown command: " + cmd)
 	}
+
+	<-ctx.Done()
+	log.Info("exiting emissary")
 }
 
 func defaultDogstatsdConfig() dogstatsdConfig {
