@@ -22,6 +22,7 @@ import (
 	"github.com/segmentio/stats/datadog"
 	"github.com/segmentio/stats/procstats"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 )
 
 type emissaryConfig struct {
@@ -65,7 +66,9 @@ func eds(ctx context.Context, cancel context.CancelFunc, client *consul.Client, 
 		}
 	}()
 
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(grpc.KeepaliveParams(keepalive.ServerParameters{
+		Time: 60 * time.Second,
+	}))
 	xds.RegisterEndpointDiscoveryServiceServer(grpcServer, emissary.NewEdsService(ctx, client))
 	log.Infof("starting emissary EndpointDiscoveryService service on port: %d", config.Port)
 	go func() {
