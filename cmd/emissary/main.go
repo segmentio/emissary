@@ -41,13 +41,13 @@ type dogstatsdConfig struct {
 // version will be set by CI using ld_flags to the git SHA on which the binary was built
 var version = "unknown"
 
-func eds(ctx context.Context, cancel context.CancelFunc, client *consul.Client, config *emissaryConfig) {
+func eds(ctx context.Context, cancel context.CancelFunc, client *consul.Client, config *emissaryConfig) *grpc.Server {
 	defer configureDogstatsd(ctx, config.Dogstatsd, "eds")()
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", config.Port))
 	if err != nil {
 		log.WithError(errors.Wrap(err, "starting EndpointDiscoveryService"))
-		return
+		return nil
 	}
 
 	mux := http.DefaultServeMux
@@ -76,6 +76,8 @@ func eds(ctx context.Context, cancel context.CancelFunc, client *consul.Client, 
 		log.Errorf("error in eds grpc server", err)
 		cancel()
 	}()
+
+	return grpcServer
 }
 
 func main() {
@@ -103,15 +105,24 @@ func main() {
 		Dogstatsd: defaultDogstatsdConfig(),
 	}
 
+	var grpcServer *grpc.Server
+
 	switch cmd, _ := conf.LoadWith(config, ld); cmd {
 	case "eds":
 		client := &consul.Client{Address: config.Consul}
-		eds(ctx, cancel, client, config)
+		grpcServer = eds(ctx, cancel, client, config)
 	default:
 		panic("unknown command: " + cmd)
 	}
 
 	<-ctx.Done()
+	log.Info("stopping emissary")
+
+	if grpcServer != nil {
+		log.Info("gracefully stopping gRPC server")
+		grpcServer.GracefulStop()
+		log.Info("grpcServer stopped")
+	}
 	log.Info("exiting emissary")
 }
 
