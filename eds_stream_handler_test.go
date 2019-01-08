@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/segmentio/consul-go"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -12,8 +11,8 @@ func TestHasChanged(t *testing.T) {
 	var tests = []struct {
 		name     string
 		expected bool
-		last     map[string][]consul.Endpoint
-		new      consulEdsResult
+		last     map[string][]Endpoint
+		new      EdsResult
 	}{
 		{
 			name:     "empty",
@@ -22,20 +21,20 @@ func TestHasChanged(t *testing.T) {
 		{
 			name:     "new empty",
 			expected: false,
-			new:      consulEdsResult{},
+			new:      EdsResult{},
 		},
 		{
 			name:     "empty add new",
 			expected: true,
-			new:      consulEdsResult{service: "foo", endpoints: []consul.Endpoint{{ID: "test"}}},
+			new:      EdsResult{Service: "foo", Endpoints: []Endpoint{{Tags: []string{"test"}}}},
 		},
 		{
 			name:     "same",
 			expected: false,
-			last: map[string][]consul.Endpoint{
-				"foo": {{ID: "test"}},
+			last: map[string][]Endpoint{
+				"foo": {{Tags: []string{"test"}}},
 			},
-			new: consulEdsResult{service: "foo", endpoints: []consul.Endpoint{{ID: "test"}}},
+			new: EdsResult{Service: "foo", Endpoints: []Endpoint{{Tags: []string{"test"}}}},
 		},
 	}
 

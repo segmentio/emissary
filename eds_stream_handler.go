@@ -1,6 +1,7 @@
 package emissary
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"sort"
@@ -9,7 +10,6 @@ import (
 
 	"github.com/apex/log"
 	xds "github.com/envoyproxy/go-control-plane/envoy/api/v2"
-	"github.com/segmentio/consul-go"
 	"github.com/segmentio/errors-go"
 	"github.com/segmentio/stats"
 )
@@ -21,11 +21,11 @@ import (
 // an update it immediately replies, after applying the changes. We use the lastVersion and lastNonce
 // to verify that Envoy has received and applied the last change we pushed.
 type edsStreamHandler struct {
-	lastEndpoints     map[string][]consul.Endpoint
+	lastEndpoints     map[string][]Endpoint
 	lastResourceNames map[string]bool
 	lastVersion       int
 	lastNonce         string
-	results           chan consulEdsResult
+	results           chan EdsResult
 	ctx               context.Context
 	cancel            context.CancelFunc
 }
@@ -34,9 +34,9 @@ type edsStreamHandler struct {
 func newEdsStreamHandler() *edsStreamHandler {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &edsStreamHandler{
-		lastEndpoints:     make(map[string][]consul.Endpoint),
+		lastEndpoints:     make(map[string][]Endpoint),
 		lastResourceNames: make(map[string]bool),
-		results:           make(chan consulEdsResult),
+		results:           make(chan EdsResult),
 		ctx:               ctx,
 		cancel:            cancel,
 	}
@@ -50,7 +50,7 @@ func newEdsStreamHandler() *edsStreamHandler {
 //
 // If we encounter any error during bi-directional communication with the grpc client, such as Socket read or write error, unexpected
 // typeUrl or error to properly parse consul data we will return these errors to the caller
-func (e *edsStreamHandler) run(ctx context.Context, server xds.EndpointDiscoveryService_StreamEndpointsServer, poller *consulEdsPoller) error {
+func (e *edsStreamHandler) run(ctx context.Context, server xds.EndpointDiscoveryService_StreamEndpointsServer, poller *edsPoller) error {
 	// Close our local edsStreamHandler context when we exit, this tells the handle func from the poller it can exit
 	defer e.cancel()
 	for {
@@ -100,7 +100,7 @@ func (e *edsStreamHandler) run(ctx context.Context, server xds.EndpointDiscovery
 // correspond to a service within consul. We then build a map of these names. We then look at the previous
 // request for resource names and determine if any have been added or remove. If so we add or remove our
 // interest in them from the consulEdsPoller
-func (e *edsStreamHandler) updateResources(poller *consulEdsPoller, request *xds.DiscoveryRequest) {
+func (e *edsStreamHandler) updateResources(poller *edsPoller, request *xds.DiscoveryRequest) {
 	// build a map of resources requested
 	newResourceRequests := make(map[string]bool)
 	for _, service := range request.ResourceNames {
@@ -117,27 +117,27 @@ func (e *edsStreamHandler) updateResources(poller *consulEdsPoller, request *xds
 	//check new map, if not in old add
 	for service := range newResourceRequests {
 		if _, ok := e.lastResourceNames[service]; !ok {
-			poller.add(service, e)
+			poller.addSubscription(service, e)
 		}
 	}
 }
 
-// Here we're implementing the consulResultHandler interface. This function acts as a simple shim to allow
-// us to receive a consulEdsResult from some external source. The select ensures we'll either successfully send
+// Here we're implementing the ResultHandler interface. This function acts as a simple shim to allow
+// us to receive a EdsResult from some external source. The select ensures we'll either successfully send
 // the update to the edsStreamHandler or return if the edsStreamHandler has exited before we could furnish our results.
-func (e *edsStreamHandler) handle(result consulEdsResult) {
+func (e *edsStreamHandler) handle(result EdsResult) {
 	select {
 	case <-e.ctx.Done():
 	case e.results <- result:
 	}
 }
 
-// Send takes the healthy endpoints we received from consul in a consulEdsResult and constructs a
+// Send takes the healthy endpoints we received from the poller in a EdsResult and constructs a
 // ClusterLoadAssignment protobuf, this is then wrapped in a DiscoveryResponse protobuf and send out grpc.
 //
 // Before sending we bump the version and create a new Nonce for our response.
 // If we encounter any error preparing the response or on send the error is returned to the caller.
-func (e *edsStreamHandler) send(server xds.EndpointDiscoveryService_StreamEndpointsServer, results consulEdsResult, url string) error {
+func (e *edsStreamHandler) send(server xds.EndpointDiscoveryService_StreamEndpointsServer, results EdsResult, url string) error {
 	cla := buildClusterLoadAssignment(results)
 	resp, err := buildDiscoveryResponse(url, cla)
 	if err != nil {
@@ -151,33 +151,28 @@ func (e *edsStreamHandler) send(server xds.EndpointDiscoveryService_StreamEndpoi
 	resp.VersionInfo = strconv.Itoa(e.lastVersion)
 
 	log.Debug("sending DiscoveryResponse")
-	e.lastEndpoints[results.service] = results.endpoints
+	e.lastEndpoints[results.Service] = results.Endpoints
 	return server.Send(resp)
 }
 
 // Inspect the results of the latest query from consul. Compare with the lastEndpoints cache
 // and if we detect a change return true, otherwise return false
-func (e *edsStreamHandler) hasChanged(results consulEdsResult) bool {
+func (e *edsStreamHandler) hasChanged(results EdsResult) bool {
 	// retrieve the last slice of endpoints cached for our service
-	lastEndpoints := e.lastEndpoints[results.service]
+	lastEndpoints := e.lastEndpoints[results.Service]
 	// If the length differs we have a change
-	if len(lastEndpoints) != len(results.endpoints) {
+	if len(lastEndpoints) != len(results.Endpoints) {
 		stats.Incr("endpoints-count.changed")
 		return true
 	}
 
-	// The lengths are the same, so now we need to compare
-	// the endpoints one-by-one, first sort them.
 	sort.Slice(lastEndpoints, func(i, j int) bool {
-		return lastEndpoints[i].ID < lastEndpoints[j].ID
-	})
-	sort.Slice(results.endpoints, func(i, j int) bool {
-		return results.endpoints[i].ID < results.endpoints[j].ID
+		return bytes.Compare([]byte(lastEndpoints[i].Addr.String()), []byte(lastEndpoints[j].Addr.String())) < 0
 	})
 
 	// Now compare consul.Endpoint one by one in each slice
 	// at the same index if they are not equal we have a change.
-	for i, v := range results.endpoints {
+	for i, v := range results.Endpoints {
 		if !compare(lastEndpoints[i], v) {
 			stats.Incr("endpoints.changed")
 			return true

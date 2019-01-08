@@ -1,0 +1,52 @@
+version: '3'
+services:
+  envoy:
+      build:
+        context: .
+        dockerfile: Dockerfile-envoy
+      volumes:
+        - ./envoy.yaml:/etc/envoy.yaml
+      network_mode: "host"
+      expose:
+        - "80"
+        - "8001"
+      ports:
+        - "80:80"
+        - "8001:8001"
+
+  emissary:
+    image: emissary:latest
+    command:
+        - "eds"
+        - "-docker.host"
+        - "unix:///var/run/docker.sock"
+    expose:
+      - "9001"
+    ports:
+      - "9001:9001"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  foo:
+    build:
+      context: .
+      dockerfile: Dockerfile-foobar
+    command: /server foo 3000
+    expose:
+      - "3000"
+    ports:
+      - "3001:3000"
+    labels:
+        emissary.service_name: "foobar-api"
+
+  bar:
+    build:
+      context: .
+      dockerfile: Dockerfile-foobar
+    command: /server bar 3000
+    expose:
+      - "3000"
+    ports:
+      - "3002:3000"
+    labels:
+        emissary.service_name: "foobar-api"

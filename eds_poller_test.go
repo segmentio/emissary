@@ -11,9 +11,9 @@ import (
 )
 
 func TestAddRemove(t *testing.T) {
-	p := newConsulEdsPoller(&consul.Resolver{}, time.NewTicker(time.Second))
+	p := newEdsPoller(&ConsulResolver{rslv: &consul.Resolver{}}, time.NewTicker(time.Second))
 	esh := &edsStreamHandler{}
-	p.add("foo", esh)
+	p.addSubscription("foo", esh)
 	handlers := p.get("foo")
 	assert.Equal(t, esh, handlers[0], "expected to find edsStreamHandler")
 	p.removeSubscription("foo", esh)
@@ -22,11 +22,11 @@ func TestAddRemove(t *testing.T) {
 }
 
 func TestRemoveFromSet(t *testing.T) {
-	p := newConsulEdsPoller(&consul.Resolver{}, time.NewTicker(time.Second))
+	p := newEdsPoller(&ConsulResolver{rslv: &consul.Resolver{}}, time.NewTicker(time.Second))
 	esh := &edsStreamHandler{}
 	esh2 := &edsStreamHandler{}
-	p.add("foo", esh)
-	p.add("foo", esh2)
+	p.addSubscription("foo", esh)
+	p.addSubscription("foo", esh2)
 
 	handlers := p.get("foo")
 	assert.Equal(t, esh, handlers[0], "expected to find edsStreamHandler")
@@ -38,10 +38,10 @@ func TestRemoveFromSet(t *testing.T) {
 }
 
 func TestRemoveHandler(t *testing.T) {
-	p := newConsulEdsPoller(&consul.Resolver{}, time.NewTicker(time.Second))
+	p := newEdsPoller(&ConsulResolver{rslv: &consul.Resolver{}}, time.NewTicker(time.Second))
 	esh := &edsStreamHandler{}
-	p.add("foo", esh)
-	p.add("bar", esh)
+	p.addSubscription("foo", esh)
+	p.addSubscription("bar", esh)
 
 	handlers := p.get("foo")
 	assert.Equal(t, 1, len(handlers), "expected slice len of one")
@@ -58,12 +58,12 @@ func TestRemoveHandler(t *testing.T) {
 }
 
 func TestRemoveHandlerOthersRemaining(t *testing.T) {
-	p := newConsulEdsPoller(&consul.Resolver{}, time.NewTicker(time.Second))
+	p := newEdsPoller(&ConsulResolver{rslv: &consul.Resolver{}}, time.NewTicker(time.Second))
 	esh := &edsStreamHandler{}
 	esh2 := &edsStreamHandler{}
-	p.add("foo", esh)
-	p.add("bar", esh)
-	p.add("bar", esh2)
+	p.addSubscription("foo", esh)
+	p.addSubscription("bar", esh)
+	p.addSubscription("bar", esh2)
 
 	handlers := p.get("foo")
 	assert.Equal(t, 1, len(handlers), "expected slice len of one")
@@ -113,34 +113,34 @@ func TestPulse(t *testing.T) {
 	ch := make(chan time.Time)
 	tr := &time.Ticker{C: ch}
 
-	cep := consulEdsPoller{subscriptions: make(map[string]map[consulResultHandler]struct{}),
-		resolver: &r,
+	cep := edsPoller{subscriptions: make(map[string]map[resultHandler]struct{}),
+		resolver: &ConsulResolver{rslv: &r},
 		ticker:   tr,
 		mutex:    sync.RWMutex{},
 	}
 
-	h := &mockEdsStreamHandler{results: make(chan consulEdsResult)}
-	cep.add("1234", h)
+	h := &mockEdsStreamHandler{results: make(chan EdsResult)}
+	cep.addSubscription("1234", h)
 
 	cep.pulse(context.Background())
 	ch <- time.Now()
 	firstResult := <-h.results
-	assert.Equal(t, 3, len(firstResult.endpoints), "expected 3 results")
+	assert.Equal(t, 3, len(firstResult.Endpoints), "expected 3 results")
 	ch <- time.Now()
 	secondResult := <-h.results
-	assert.Equal(t, 3, len(secondResult.endpoints), "expected 3 results")
+	assert.Equal(t, 3, len(secondResult.Endpoints), "expected 3 results")
 	assert.Equal(t, firstResult, secondResult, "expected equal results")
 	ch <- time.Now()
 	thirdResult := <-h.results
-	assert.Equal(t, 2, len(thirdResult.endpoints), "expected 2 results")
+	assert.Equal(t, 2, len(thirdResult.Endpoints), "expected 2 results")
 	assert.NotEqual(t, secondResult, thirdResult, "expected a change in results")
 
 }
 
 type mockEdsStreamHandler struct {
-	results chan consulEdsResult
+	results chan EdsResult
 }
 
-func (m *mockEdsStreamHandler) handle(result consulEdsResult) {
+func (m *mockEdsStreamHandler) handle(result EdsResult) {
 	m.results <- result
 }

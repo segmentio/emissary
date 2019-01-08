@@ -1,0 +1,5 @@
+FROM envoyproxy/envoy:latest
+RUN apt-get update && apt-get -q install -y \
+    curl
+COPY envoy.yaml /etc/envoy.yaml
+CMD /usr/local/bin/envoy -c /etc/envoy.yaml --service-cluster cluster0 --service-node node --service-zone us-west-1a

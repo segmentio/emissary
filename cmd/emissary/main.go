@@ -26,22 +26,30 @@ import (
 )
 
 type emissaryConfig struct {
-	Port      int             `conf:"port"`
-	AdminPort int             `conf:"adminport"`
-	Consul    string          `conf:"consul"`
-	Dogstatsd dogstatsdConfig `conf:"dogstatsd" help:"dogstatsd Configuration"`
+	Port         int                  `conf:"port"          help:"Bind port."`
+	AdminPort    int                  `conf:"adminport"     help:"Admin port for healthcheck."`
+	Consul       string               `conf:"consul"        help:"If configure, emissary will use Consul as resolver.`
+	Docker       dockerResolverConfig `conf:"docker"        help:"If configure, emissary will use Docker as resolver."`
+	Dogstatsd    dogstatsdConfig      `conf:"dogstatsd"     help:"dogstatsd Configuration."`
+	PollInterval time.Duration        `conf:"poll-interval" help:"Interval for the poller."`
 }
 
 type dogstatsdConfig struct {
-	Address    string        `conf:"address" help:"Address of the dogstatsd agent that will receive metrics"`
+	Address    string        `conf:"address"     help:"Address of the dogstatsd agent that will receive metrics"`
 	BufferSize int           `conf:"buffer-size" help:"Size of the statsd metrics buffer" validate:"min=0"`
 	FlushEvery time.Duration `conf:"flush-every" help:"Flush AT LEAST this frequently"`
+}
+
+type dockerResolverConfig struct {
+	Host         string `conf:"host"          help:"Address of the Docker resolver."`
+	ServicePort  int    `conf:"service-port"  help:"Private port exported by the containers."`
+	ServiceLabel string `conf:"service-label" help:"Name of the label to use for service lookup."`
 }
 
 // version will be set by CI using ld_flags to the git SHA on which the binary was built
 var version = "unknown"
 
-func eds(ctx context.Context, cancel context.CancelFunc, client *consul.Client, config *emissaryConfig) *grpc.Server {
+func eds(ctx context.Context, cancel context.CancelFunc, config *emissaryConfig) *grpc.Server {
 	defer configureDogstatsd(ctx, config.Dogstatsd, "eds")()
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", config.Port))
@@ -51,30 +59,69 @@ func eds(ctx context.Context, cancel context.CancelFunc, client *consul.Client, 
 	}
 
 	mux := http.DefaultServeMux
-	mux.HandleFunc("/internal/health", func(w http.ResponseWriter, r *http.Request) {
-		var recv string
-		err := client.Get(context.Background(), "/v1/status/leader", nil, &recv)
-		if err != nil {
-			w.WriteHeader(500)
-			return
-		}
-	})
-
-	go func() {
-		if err := http.ListenAndServe(fmt.Sprintf(":%d", config.AdminPort), nil); err != nil {
-			panic(fmt.Sprintf("unable to bind to admin port %d, exiting.", config.AdminPort))
-		}
-	}()
 
 	grpcServer := grpc.NewServer(grpc.KeepaliveParams(keepalive.ServerParameters{
 		Time: 60 * time.Second,
 	}))
-	xds.RegisterEndpointDiscoveryServiceServer(grpcServer, emissary.NewEdsService(ctx, client))
+
+	var eds *emissary.EdsService
+	if len(config.Consul) != 0 {
+		log.Infof("configuring Consul resolver: %s", config.Consul)
+
+		client := consul.Client{Address: config.Consul}
+		resolver := &consul.Resolver{
+			Client: &client,
+		}
+		eds = emissary.NewEdsService(ctx, emissary.WithConsul(resolver, config.PollInterval))
+
+		mux.HandleFunc("/internal/health", func(w http.ResponseWriter, r *http.Request) {
+			var recv string
+			err := client.Get(context.Background(), "/v1/status/leader", nil, &recv)
+			if err != nil {
+				w.WriteHeader(500)
+				return
+			}
+		})
+
+	} else if len(config.Docker.Host) != 0 {
+		log.Infof("configuring Docker resolver: %s", config.Docker.Host)
+
+		resolver := emissary.DockerResolver{
+			Client: emissary.DockerClient{
+				Host: config.Docker.Host,
+			},
+		}
+
+		if config.Docker.ServicePort != 0 {
+			emissary.DockerServicePort = config.Docker.ServicePort
+		}
+
+		if len(config.Docker.ServiceLabel) != 0 {
+			emissary.DockerServiceLabel = config.Docker.ServiceLabel
+		}
+
+		eds = emissary.NewEdsService(ctx, emissary.WithDocker(&resolver, config.PollInterval))
+
+		mux.HandleFunc("/internal/health", func(w http.ResponseWriter, r *http.Request) {
+			//TODO: implement healthcheck for Docker API
+			w.WriteHeader(200)
+		})
+	} else {
+		panic("no resolver has been configured.")
+	}
+
+	xds.RegisterEndpointDiscoveryServiceServer(grpcServer, eds)
 	log.Infof("starting emissary EndpointDiscoveryService service on port: %d", config.Port)
 	go func() {
 		err := grpcServer.Serve(lis)
 		log.Errorf("error in eds grpc server", err)
 		cancel()
+	}()
+
+	go func() {
+		if err := http.ListenAndServe(fmt.Sprintf(":%d", config.AdminPort), nil); err != nil {
+			panic(fmt.Sprintf("unable to bind to admin port %d, exiting.", config.AdminPort))
+		}
 	}()
 
 	return grpcServer
@@ -99,18 +146,21 @@ func main() {
 
 	events.DefaultLogger.EnableDebug = false
 	config := &emissaryConfig{
-		Port:      9001,
-		AdminPort: 9002,
-		Consul:    "localhost:8500",
-		Dogstatsd: defaultDogstatsdConfig(),
+		Port:         9001,
+		AdminPort:    9002,
+		PollInterval: 10 * time.Second,
+		Dogstatsd:    defaultDogstatsdConfig(),
+	}
+
+	if len(config.Consul) != 0 && len(config.Docker.Host) != 0 {
+		panic("use either -consul or -docker-host.")
 	}
 
 	var grpcServer *grpc.Server
 
 	switch cmd, _ := conf.LoadWith(config, ld); cmd {
 	case "eds":
-		client := &consul.Client{Address: config.Consul}
-		grpcServer = eds(ctx, cancel, client, config)
+		grpcServer = eds(ctx, cancel, config)
 	default:
 		panic("unknown command: " + cmd)
 	}
