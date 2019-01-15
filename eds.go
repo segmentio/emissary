@@ -25,25 +25,17 @@ var (
 
 // EdsService implements the Envoy xDS EndpointDiscovery service
 type EdsService struct {
-	consulEndpointPoller *consulEdsPoller // our consul poller that handles subscriptions for endpoint info from grpc clients
-	rslv                 *consul.Resolver // our consul resolver
-	ctx                  context.Context  // our root context
+	ctx    context.Context // root context
+	rslv   Resolver        // Resolver of the EDS service
+	poller *edsPoller      // EDS poller that handles subscriptions for endpoint info from grpc clients
 }
 
-// TracerOpt configures a Tracer
+// EdsOpt configures an EdsService
 type EdsOpt func(t *EdsService)
 
-// Create a new EDS service using consulAddr for fetching
-// consul service discovery data
-func NewEdsService(ctx context.Context, client *consul.Client, opts ...EdsOpt) *EdsService {
-	return NewEdsServiceWithPollInterval(ctx, client, time.Second, opts...)
-}
-
-// Create a new EDS service using consul client to fetch consul service endpoints
-func NewEdsServiceWithPollInterval(ctx context.Context, client *consul.Client, consulPollInterval time.Duration, opts ...EdsOpt) *EdsService {
-	rslv := consul.Resolver{Client: client}
-	poller := newConsulEdsPoller(&rslv, time.NewTicker(consulPollInterval))
-	eds := &EdsService{consulEndpointPoller: poller, rslv: &rslv, ctx: ctx}
+// Create a new EDS service
+func NewEdsService(ctx context.Context, opts ...EdsOpt) *EdsService {
+	eds := &EdsService{ctx: ctx}
 
 	for _, opt := range opts {
 		if opt == nil {
@@ -52,15 +44,25 @@ func NewEdsServiceWithPollInterval(ctx context.Context, client *consul.Client, c
 		opt(eds)
 	}
 
-	poller.pulse(ctx)
+	//TODO: put that someplace else.
+	eds.poller.pulse(ctx)
+
 	return eds
 }
 
-// Sets the consul-go resolver to use
-func WithResolver(rslv *consul.Resolver) EdsOpt {
+// Setup the EdsService resolver and poller to use Consul
+func WithConsul(resolver *ConsulResolver, pollInterval time.Duration) EdsOpt {
 	return func(e *EdsService) {
-		e.rslv = rslv
-		e.consulEndpointPoller.resolver = rslv
+		e.rslv = resolver
+		e.poller = newEdsPoller(resolver, time.NewTicker(pollInterval))
+	}
+}
+
+// Setup the EdsService resolver and poller to use Docker
+func WithDocker(resolver *DockerResolver, pollInterval time.Duration) EdsOpt {
+	return func(e *EdsService) {
+		e.rslv = resolver
+		e.poller = newEdsPoller(resolver, time.NewTicker(pollInterval))
 	}
 }
 
@@ -73,13 +75,13 @@ func (e *EdsService) StreamEndpoints(server xds.EndpointDiscoveryService_StreamE
 	log.Debug("in stream endpoints")
 	stats.Incr("stream-endpoints.connections.new")
 	handler := newEdsStreamHandler()
-	err := handler.run(e.ctx, server, e.consulEndpointPoller)
+	err := handler.run(e.ctx, server, e.poller)
 	if err != nil {
 		log.Infof("error in handler %s", err)
 		stats.Incr("stream-endpoints.handler.error")
 	}
 	stats.Incr("stream-endpoints.connections.closed")
-	e.consulEndpointPoller.removeHandler(handler)
+	e.poller.removeHandler(handler)
 	return err
 }
 
@@ -99,13 +101,13 @@ func (e *EdsService) FetchEndpoints(ctx context.Context, request *xds.DiscoveryR
 		return nil, errors.Errorf("unsupported TypeUrl %s", request.TypeUrl)
 	}
 
-	results := make([]consulEdsResult, len(request.ResourceNames))
+	results := make([]EdsResult, len(request.ResourceNames))
 	for _, cluster := range request.ResourceNames {
-		endpoints, err := e.rslv.LookupService(context.Background(), cluster)
+		endpoints, err := e.rslv.Lookup(ctx, cluster)
 		if err != nil {
 			return nil, errors.Wrap(err, "lookup service")
 		}
-		results = append(results, consulEdsResult{service: cluster, endpoints: endpoints})
+		results = append(results, EdsResult{Service: cluster, Endpoints: endpoints})
 	}
 
 	clas := make([]*xds.ClusterLoadAssignment, len(results))
@@ -139,14 +141,14 @@ func buildDiscoveryResponse(url string, clas ...*xds.ClusterLoadAssignment) (*xd
 	}, nil
 }
 
-// Converts a consulEdsResult (list of healthy endpoints for a service in consul) to a ClusterLoadAssignment,
+// Converts an EdsResult (list of healthy endpoints for a service) to a ClusterLoadAssignment,
 // which is a protobuf generated payload the envoy client expects over grpc.
-func buildClusterLoadAssignment(results consulEdsResult) *xds.ClusterLoadAssignment {
+func buildClusterLoadAssignment(results EdsResult) *xds.ClusterLoadAssignment {
 	cla := &xds.ClusterLoadAssignment{
-		ClusterName: results.service,
+		ClusterName: results.Service,
 	}
 
-	azMap := buildAzMap(results.endpoints)
+	azMap := buildAzMap(results.Endpoints)
 	for az, endpoints := range azMap {
 		for _, addr := range endpoints {
 			a := strings.Split(addr.Addr.String(), ":")
@@ -185,9 +187,9 @@ func buildClusterLoadAssignment(results consulEdsResult) *xds.ClusterLoadAssignm
 
 //////////////////////////////// SHARED UTIL FUNCTIONS ///////////////////////////////////////////////
 
-// Takes a slice of consul.Endpoints and groupBy AZ
-func buildAzMap(endoints []consul.Endpoint) map[string][]consul.Endpoint {
-	azMap := make(map[string][]consul.Endpoint)
+// Takes a slice of Endpoint and groupBy AZ
+func buildAzMap(endoints []Endpoint) map[string][]Endpoint {
+	azMap := make(map[string][]Endpoint)
 	for _, addr := range endoints {
 		az, ok := hasAz(addr.Tags)
 		if !ok {
@@ -213,7 +215,32 @@ func hasAz(tags []string) (string, bool) {
 }
 
 // Compare two consul.Endpoints for equality.
-func compare(e1, e2 consul.Endpoint) bool {
+func compare(e1, e2 Endpoint) bool {
+	if &e1 == &e2 {
+		return true
+	}
+
+	if e1.Addr != e2.Addr {
+		return false
+	}
+
+	sort.Strings(e1.Tags)
+	sort.Strings(e2.Tags)
+
+	if len(e1.Tags) != len(e2.Tags) {
+		return false
+	}
+
+	for i, v := range e1.Tags {
+		if e2.Tags[i] != v {
+			return false
+		}
+	}
+
+	return true
+}
+
+func compareConsulEndpoint(e1, e2 consul.Endpoint) bool {
 	if &e1 == &e2 {
 		return true
 	}

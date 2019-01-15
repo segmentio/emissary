@@ -19,187 +19,55 @@ import (
 func TestEndpointsNotEqual(t *testing.T) {
 	var tests = []struct {
 		name string
-		e1   consul.Endpoint
-		e2   consul.Endpoint
+		e1   Endpoint
+		e2   Endpoint
 	}{
 		{
-			name: "different id",
-			e1: consul.Endpoint{
-				ID:   "one",
-				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "foo",
-				Tags: make([]string, 0),
-				Meta: nil,
-				RTT:  time.Millisecond * 200,
-			},
-
-			e2: consul.Endpoint{
-				ID:   "two",
-				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "foo",
-				Tags: make([]string, 0),
-				Meta: nil,
-				RTT:  time.Millisecond * 200,
-			},
-		},
-		{
 			name: "different host",
-			e1: consul.Endpoint{
-				ID:   "one",
+			e1: Endpoint{
 				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "foo",
 				Tags: make([]string, 0),
-				Meta: nil,
-				RTT:  time.Millisecond * 200,
 			},
 
-			e2: consul.Endpoint{
-				ID:   "one",
+			e2: Endpoint{
 				Addr: serviceAddr(net.JoinHostPort("test1", strconv.Itoa(80))),
-				Node: "foo",
 				Tags: make([]string, 0),
-				Meta: nil,
-				RTT:  time.Millisecond * 200,
 			},
 		},
 		{
 			name: "different port",
-			e1: consul.Endpoint{
-				ID:   "one",
+			e1: Endpoint{
 				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "foo",
 				Tags: make([]string, 0),
-				Meta: nil,
-				RTT:  time.Millisecond * 200,
 			},
 
-			e2: consul.Endpoint{
-				ID:   "one",
+			e2: Endpoint{
 				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(81))),
-				Node: "foo",
 				Tags: make([]string, 0),
-				Meta: nil,
-				RTT:  time.Millisecond * 200,
-			},
-		},
-		{
-			name: "different node",
-			e1: consul.Endpoint{
-				ID:   "one",
-				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "foo",
-				Tags: make([]string, 0),
-				Meta: nil,
-				RTT:  time.Millisecond * 200,
-			},
-
-			e2: consul.Endpoint{
-				ID:   "one",
-				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "bar",
-				Tags: make([]string, 0),
-				Meta: nil,
-				RTT:  time.Millisecond * 200,
 			},
 		},
 		{
 			name: "different tags len",
-			e1: consul.Endpoint{
-				ID:   "one",
+			e1: Endpoint{
 				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "foo",
 				Tags: []string{"test "},
-				Meta: nil,
-				RTT:  time.Millisecond * 200,
 			},
 
-			e2: consul.Endpoint{
-				ID:   "one",
+			e2: Endpoint{
 				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "foo",
 				Tags: make([]string, 0),
-				Meta: nil,
-				RTT:  time.Millisecond * 200,
 			},
 		},
 		{
 			name: "different tags",
-			e1: consul.Endpoint{
-				ID:   "one",
+			e1: Endpoint{
 				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "foo",
 				Tags: []string{"test "},
-				Meta: nil,
-				RTT:  time.Millisecond * 200,
 			},
 
-			e2: consul.Endpoint{
-				ID:   "one",
+			e2: Endpoint{
 				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "foo",
 				Tags: []string{"foo "},
-				Meta: nil,
-				RTT:  time.Millisecond * 200,
-			},
-		},
-		{
-			name: "different meta length",
-			e1: consul.Endpoint{
-				ID:   "one",
-				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "foo",
-				Tags: []string{"test "},
-				Meta: nil,
-				RTT:  time.Millisecond * 200,
-			},
-
-			e2: consul.Endpoint{
-				ID:   "one",
-				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "foo",
-				Tags: []string{"foo "},
-				Meta: map[string]string{"foo": "bar"},
-				RTT:  time.Millisecond * 200,
-			},
-		},
-		{
-			name: "different meta",
-			e1: consul.Endpoint{
-				ID:   "one",
-				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "foo",
-				Tags: []string{"test "},
-				Meta: map[string]string{"foo": "bar"},
-				RTT:  time.Millisecond * 200,
-			},
-
-			e2: consul.Endpoint{
-				ID:   "one",
-				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "foo",
-				Tags: []string{"foo "},
-				Meta: map[string]string{"foo": "baz"},
-				RTT:  time.Millisecond * 200,
-			},
-		},
-		{
-			name: "different rtt",
-			e1: consul.Endpoint{
-				ID:   "one",
-				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "foo",
-				Tags: []string{"test "},
-				Meta: map[string]string{"foo": "bar"},
-				RTT:  time.Millisecond * 100,
-			},
-
-			e2: consul.Endpoint{
-				ID:   "one",
-				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "foo",
-				Tags: []string{"foo "},
-				Meta: map[string]string{"foo": "bar"},
-				RTT:  time.Millisecond * 200,
 			},
 		},
 	}
@@ -214,87 +82,43 @@ func TestEndpointsNotEqual(t *testing.T) {
 func TestEndpointsEqual(t *testing.T) {
 	var tests = []struct {
 		name string
-		e1   consul.Endpoint
-		e2   consul.Endpoint
+		e1   Endpoint
+		e2   Endpoint
 	}{
 		{
 			name: "same data",
-			e1: consul.Endpoint{
-				ID:   "one",
+			e1: Endpoint{
 				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "foo",
 				Tags: make([]string, 0),
-				Meta: nil,
-				RTT:  time.Millisecond * 200,
 			},
 
-			e2: consul.Endpoint{
-				ID:   "one",
+			e2: Endpoint{
 				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "foo",
 				Tags: make([]string, 0),
-				Meta: nil,
-				RTT:  time.Millisecond * 200,
-			},
-		},
-		{
-			name: "same data diff rtt",
-			e1: consul.Endpoint{
-				ID:   "one",
-				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "foo",
-				Tags: make([]string, 0),
-				Meta: nil,
-				RTT:  time.Millisecond * 200,
-			},
-
-			e2: consul.Endpoint{
-				ID:   "one",
-				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "foo",
-				Tags: make([]string, 0),
-				Meta: nil,
-				RTT:  time.Millisecond * 100,
 			},
 		},
 		{
 			name: "same data with tags",
-			e1: consul.Endpoint{
-				ID:   "one",
+			e1: Endpoint{
 				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "foo",
 				Tags: []string{"test"},
-				Meta: nil,
-				RTT:  time.Millisecond * 200,
 			},
 
-			e2: consul.Endpoint{
-				ID:   "one",
+			e2: Endpoint{
 				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "foo",
 				Tags: []string{"test"},
-				Meta: nil,
-				RTT:  time.Millisecond * 200,
 			},
 		},
 		{
 			name: "same data tags diff order",
-			e1: consul.Endpoint{
-				ID:   "one",
+			e1: Endpoint{
 				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "foo",
 				Tags: []string{"test", "one"},
-				Meta: nil,
-				RTT:  time.Millisecond * 200,
 			},
 
-			e2: consul.Endpoint{
-				ID:   "one",
+			e2: Endpoint{
 				Addr: serviceAddr(net.JoinHostPort("test", strconv.Itoa(80))),
-				Node: "foo",
 				Tags: []string{"one", "test"},
-				Meta: nil,
-				RTT:  time.Millisecond * 200,
 			},
 		},
 	}
@@ -331,37 +155,43 @@ func TestStreamEndpointsUnknownUrl(t *testing.T) {
 	server, client := newServer(t, ss)
 	defer server.Close()
 
-	rslv := consul.Resolver{
-		Client:      client,
-		ServiceTags: []string{"A", "B", "C"},
-		NodeMeta:    map[string]string{"answer": "42"},
-		OnlyPassing: true,
-		Cache:       nil,
+	rslv := ConsulResolver{
+		Resolver: &consul.Resolver{
+			Client:      client,
+			ServiceTags: []string{"A", "B", "C"},
+			NodeMeta:    map[string]string{"answer": "42"},
+			OnlyPassing: true,
+			Cache:       nil,
+		},
 	}
-	eds := NewEdsService(context.Background(), nil, WithResolver(&rslv))
+	eds := NewEdsService(context.Background(), nil, WithConsul(&rslv, 2*time.Second))
 	m := &mockEndpointServer{typeUrl: "foo"}
 	err := eds.StreamEndpoints(m)
 	assert.Equal(t, err.Error(), "unknown TypeUrl foo", "expected unknown TypeUrl")
 }
 
 func TestBuildAzMap(t *testing.T) {
-	e := []consul.Endpoint{{ID: "test"}}
+	addr1 := serviceAddr(net.JoinHostPort("test1", strconv.Itoa(80)))
+	addr2 := serviceAddr(net.JoinHostPort("test2", strconv.Itoa(80)))
+
+	e := []Endpoint{{Addr: addr1}}
 	m := buildAzMap(e)
 	assert.Equal(t, len(m), 1, "expected map len of 1")
-	assert.Equal(t, m["none"][0].ID, "test", "expected ID of test")
+	assert.Equal(t, m["none"][0].Addr, addr1, "expected Addr to be "+string(addr1))
 
-	e = []consul.Endpoint{{ID: "test", Tags: []string{"us-east-1a"}}, {ID: "test", Tags: []string{"us-east-1c"}}}
+	e = []Endpoint{{Addr: addr1, Tags: []string{"us-east-1a"}}, {Addr: addr2, Tags: []string{"us-east-1c"}}}
 	m = buildAzMap(e)
 	assert.Equal(t, len(m), 2, "expected map len of 2")
-	assert.Equal(t, m["us-east-1a"][0].ID, "test", "expected ID of test")
-	assert.Equal(t, m["us-east-1c"][0].ID, "test", "expected ID of test")
+	assert.Equal(t, m["us-east-1a"][0].Addr, addr1, "expected Addr to be "+string(addr1))
+	assert.Equal(t, m["us-east-1c"][0].Addr, addr2, "expected Addr to be "+string(addr2))
 }
 
 func TestIgnoresRegionOnlyAz(t *testing.T) {
-	e := []consul.Endpoint{{ID: "test", Tags: []string{"us-east-1", "us-east-1c"}}}
+	addr := serviceAddr(net.JoinHostPort("test", strconv.Itoa(80)))
+	e := []Endpoint{{Addr: addr, Tags: []string{"us-east-1", "us-east-1c"}}}
 	m := buildAzMap(e)
 	assert.Equal(t, len(m), 1, "expected map len of 1")
-	assert.Equal(t, m["us-east-1c"][0].ID, "test", "expected ID of test")
+	assert.Equal(t, m["us-east-1c"][0].Addr, addr, "expected Addr to be "+string(addr))
 }
 
 func TestStreamEndpoints(t *testing.T) {
@@ -377,14 +207,16 @@ func TestStreamEndpoints(t *testing.T) {
 	server, client := newServer(t, ss)
 	defer server.Close()
 
-	rslv := consul.Resolver{
-		Client:      client,
-		ServiceTags: []string{"A", "B", "C"},
-		NodeMeta:    map[string]string{"answer": "42"},
-		OnlyPassing: true,
-		Cache:       nil,
+	rslv := ConsulResolver{
+		Resolver: &consul.Resolver{
+			Client:      client,
+			ServiceTags: []string{"A", "B", "C"},
+			NodeMeta:    map[string]string{"answer": "42"},
+			OnlyPassing: true,
+			Cache:       nil,
+		},
 	}
-	eds := NewEdsService(context.Background(), nil, WithResolver(&rslv))
+	eds := NewEdsService(context.Background(), WithConsul(&rslv, 1*time.Second))
 	m := &mockEndpointServer{typeUrl: "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment",
 		resourceNames: []string{"1234"},
 		t:             t,
