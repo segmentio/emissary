@@ -20,7 +20,12 @@ type Endpoint struct {
 
 // Resolver to lookup endpoints for a specific service.
 type Resolver interface {
+	// Lookup for the service or cluster and return a list of Endpoint.
+	// Envoy will forward the traffic to those Endpoints.
 	Lookup(context.Context, string) ([]Endpoint, error)
+
+	// Return true if the Resolver is healthy.
+	Healthy(context.Context) bool
 }
 
 type resultHandler interface {

@@ -8,12 +8,13 @@ import (
 
 // ConsulResolver implements the Resolver interface.
 type ConsulResolver struct {
-	rslv *consul.Resolver
+	Client   *consul.Client
+	Resolver *consul.Resolver
 }
 
 // Lookup for service in Consul.
 func (c *ConsulResolver) Lookup(ctx context.Context, service string) ([]Endpoint, error) {
-	consulEndpoints, err := c.rslv.LookupService(ctx, service)
+	consulEndpoints, err := c.Resolver.LookupService(ctx, service)
 	if err != nil {
 		return nil, err
 	}
@@ -26,4 +27,13 @@ func (c *ConsulResolver) Lookup(ctx context.Context, service string) ([]Endpoint
 		})
 	}
 	return endpoints, nil
+}
+
+func (c *ConsulResolver) Healthy(ctx context.Context) bool {
+	var recv string
+	err := c.Client.Get(ctx, "/v1/status/leader", nil, &recv)
+	if err != nil {
+		return false
+	}
+	return true
 }

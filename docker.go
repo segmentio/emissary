@@ -63,6 +63,26 @@ func (c *DockerClient) get(path string, ret interface{}) (err error) {
 	return
 }
 
+func (c *DockerClient) getStatus(key string) (string, error) {
+	info := dockerInfo{}
+	err := c.get("/info", &info)
+	if err != nil {
+		return "", err
+	}
+
+	for _, s := range info.SystemStatus {
+		if len(s) != 2 {
+			continue
+		}
+
+		if s[0] == key {
+			return s[1], nil
+		}
+	}
+
+	return "", fmt.Errorf("%s status not found", key)
+}
+
 type dockerContainer struct {
 	Image           dockerImage
 	NetworkSettings dockerNetworkSettings
@@ -91,6 +111,10 @@ type dockerNetwork struct {
 type dockerIPAMConfig struct {
 	IPv4Address string
 	IPv6Address string
+}
+
+type dockerInfo struct {
+	SystemStatus [][]string
 }
 
 type dockerImage string

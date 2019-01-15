@@ -55,6 +55,14 @@ func (d *DockerResolver) Lookup(ctx context.Context, service string) ([]Endpoint
 	return endpoints, nil
 }
 
+func (d *DockerResolver) Healthy(ctx context.Context) bool {
+	state, err := d.Client.getStatus("State")
+	if err != nil {
+		return false
+	}
+	return state == "Healthy"
+}
+
 func parseAddr(hostIp string, port int) (*net.TCPAddr, error) {
 	ip := net.ParseIP(hostIp)
 	if ip == nil {

@@ -11,7 +11,7 @@ import (
 )
 
 func TestAddRemove(t *testing.T) {
-	p := newEdsPoller(&ConsulResolver{rslv: &consul.Resolver{}}, time.NewTicker(time.Second))
+	p := newEdsPoller(&ConsulResolver{Resolver: &consul.Resolver{}}, time.NewTicker(time.Second))
 	esh := &edsStreamHandler{}
 	p.addSubscription("foo", esh)
 	handlers := p.get("foo")
@@ -22,7 +22,7 @@ func TestAddRemove(t *testing.T) {
 }
 
 func TestRemoveFromSet(t *testing.T) {
-	p := newEdsPoller(&ConsulResolver{rslv: &consul.Resolver{}}, time.NewTicker(time.Second))
+	p := newEdsPoller(&ConsulResolver{Resolver: &consul.Resolver{}}, time.NewTicker(time.Second))
 	esh := &edsStreamHandler{}
 	esh2 := &edsStreamHandler{}
 	p.addSubscription("foo", esh)
@@ -38,7 +38,7 @@ func TestRemoveFromSet(t *testing.T) {
 }
 
 func TestRemoveHandler(t *testing.T) {
-	p := newEdsPoller(&ConsulResolver{rslv: &consul.Resolver{}}, time.NewTicker(time.Second))
+	p := newEdsPoller(&ConsulResolver{Resolver: &consul.Resolver{}}, time.NewTicker(time.Second))
 	esh := &edsStreamHandler{}
 	p.addSubscription("foo", esh)
 	p.addSubscription("bar", esh)
@@ -58,7 +58,7 @@ func TestRemoveHandler(t *testing.T) {
 }
 
 func TestRemoveHandlerOthersRemaining(t *testing.T) {
-	p := newEdsPoller(&ConsulResolver{rslv: &consul.Resolver{}}, time.NewTicker(time.Second))
+	p := newEdsPoller(&ConsulResolver{Resolver: &consul.Resolver{}}, time.NewTicker(time.Second))
 	esh := &edsStreamHandler{}
 	esh2 := &edsStreamHandler{}
 	p.addSubscription("foo", esh)
@@ -114,7 +114,7 @@ func TestPulse(t *testing.T) {
 	tr := &time.Ticker{C: ch}
 
 	cep := edsPoller{subscriptions: make(map[string]map[resultHandler]struct{}),
-		resolver: &ConsulResolver{rslv: &r},
+		resolver: &ConsulResolver{Resolver: &r},
 		ticker:   tr,
 		mutex:    sync.RWMutex{},
 	}

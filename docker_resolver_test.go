@@ -148,3 +148,49 @@ func TestDockerResolver(t *testing.T) {
 		t.Log("expected: ", addr)
 	}
 }
+
+func TestDockerHealthy(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/info" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		w.Write([]byte(`{
+  "ID": "7TRN:IPZB:QYBB:VPBQ:UMPP:KARE:6ZNR:XE6T:7EWV:PKF4:ZOJD:TPYS",
+  "SystemStatus": [
+    [
+      "Role",
+      "primary"
+    ],
+    [
+      "State",
+      "Healthy"
+    ],
+    [
+      "Strategy",
+      "spread"
+    ]
+  ],
+  "SecurityOptions": [
+    "name=apparmor",
+    "name=seccomp,profile=default",
+    "name=selinux",
+    "name=userns"
+  ]
+}
+`))
+	}))
+
+	defer server.Close()
+
+	resolver := DockerResolver{
+		Client: DockerClient{
+			Host: server.URL[7:],
+		},
+	}
+
+	if !resolver.Healthy(context.TODO()) {
+		t.Error("docker should be healthy")
+	}
+}

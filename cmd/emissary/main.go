@@ -58,35 +58,29 @@ func eds(ctx context.Context, cancel context.CancelFunc, config *emissaryConfig)
 		return nil
 	}
 
-	mux := http.DefaultServeMux
-
 	grpcServer := grpc.NewServer(grpc.KeepaliveParams(keepalive.ServerParameters{
 		Time: 60 * time.Second,
 	}))
 
 	var eds *emissary.EdsService
+	var resolver emissary.Resolver
+
 	if len(config.Consul) != 0 {
 		log.Infof("configuring Consul resolver: %s", config.Consul)
 
 		client := consul.Client{Address: config.Consul}
-		resolver := &consul.Resolver{
+		resolver = &emissary.ConsulResolver{
+			Resolver: &consul.Resolver{
+				Client: &client,
+			},
 			Client: &client,
 		}
-		eds = emissary.NewEdsService(ctx, emissary.WithConsul(resolver, config.PollInterval))
-
-		mux.HandleFunc("/internal/health", func(w http.ResponseWriter, r *http.Request) {
-			var recv string
-			err := client.Get(context.Background(), "/v1/status/leader", nil, &recv)
-			if err != nil {
-				w.WriteHeader(500)
-				return
-			}
-		})
+		eds = emissary.NewEdsService(ctx, emissary.WithConsul(resolver.(*emissary.ConsulResolver), config.PollInterval))
 
 	} else if len(config.Docker.Host) != 0 {
 		log.Infof("configuring Docker resolver: %s", config.Docker.Host)
 
-		resolver := emissary.DockerResolver{
+		resolver = &emissary.DockerResolver{
 			Client: emissary.DockerClient{
 				Host: config.Docker.Host,
 			},
@@ -100,15 +94,19 @@ func eds(ctx context.Context, cancel context.CancelFunc, config *emissaryConfig)
 			emissary.DockerServiceLabel = config.Docker.ServiceLabel
 		}
 
-		eds = emissary.NewEdsService(ctx, emissary.WithDocker(&resolver, config.PollInterval))
-
-		mux.HandleFunc("/internal/health", func(w http.ResponseWriter, r *http.Request) {
-			//TODO: implement healthcheck for Docker API
-			w.WriteHeader(200)
-		})
+		eds = emissary.NewEdsService(ctx, emissary.WithDocker(resolver.(*emissary.DockerResolver), config.PollInterval))
 	} else {
 		panic("no resolver has been configured.")
 	}
+
+	mux := http.DefaultServeMux
+	mux.HandleFunc("/internal/health", func(w http.ResponseWriter, r *http.Request) {
+		if !resolver.Healthy(ctx) {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
 
 	xds.RegisterEndpointDiscoveryServiceServer(grpcServer, eds)
 	log.Infof("starting emissary EndpointDiscoveryService service on port: %d", config.Port)

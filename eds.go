@@ -45,18 +45,13 @@ func NewEdsService(ctx context.Context, opts ...EdsOpt) *EdsService {
 	}
 
 	//TODO: put that someplace else.
-	if eds.poller != nil {
-		eds.poller.pulse(ctx)
-	}
+	eds.poller.pulse(ctx)
 
 	return eds
 }
 
 // Setup the EdsService resolver and poller to use Consul
-func WithConsul(rslv *consul.Resolver, pollInterval time.Duration) EdsOpt {
-	resolver := &ConsulResolver{
-		rslv: rslv,
-	}
+func WithConsul(resolver *ConsulResolver, pollInterval time.Duration) EdsOpt {
 	return func(e *EdsService) {
 		e.rslv = resolver
 		e.poller = newEdsPoller(resolver, time.NewTicker(pollInterval))

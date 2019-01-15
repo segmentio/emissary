@@ -155,12 +155,14 @@ func TestStreamEndpointsUnknownUrl(t *testing.T) {
 	server, client := newServer(t, ss)
 	defer server.Close()
 
-	rslv := consul.Resolver{
-		Client:      client,
-		ServiceTags: []string{"A", "B", "C"},
-		NodeMeta:    map[string]string{"answer": "42"},
-		OnlyPassing: true,
-		Cache:       nil,
+	rslv := ConsulResolver{
+		Resolver: &consul.Resolver{
+			Client:      client,
+			ServiceTags: []string{"A", "B", "C"},
+			NodeMeta:    map[string]string{"answer": "42"},
+			OnlyPassing: true,
+			Cache:       nil,
+		},
 	}
 	eds := NewEdsService(context.Background(), nil, WithConsul(&rslv, 2*time.Second))
 	m := &mockEndpointServer{typeUrl: "foo"}
@@ -205,12 +207,14 @@ func TestStreamEndpoints(t *testing.T) {
 	server, client := newServer(t, ss)
 	defer server.Close()
 
-	rslv := consul.Resolver{
-		Client:      client,
-		ServiceTags: []string{"A", "B", "C"},
-		NodeMeta:    map[string]string{"answer": "42"},
-		OnlyPassing: true,
-		Cache:       nil,
+	rslv := ConsulResolver{
+		Resolver: &consul.Resolver{
+			Client:      client,
+			ServiceTags: []string{"A", "B", "C"},
+			NodeMeta:    map[string]string{"answer": "42"},
+			OnlyPassing: true,
+			Cache:       nil,
+		},
 	}
 	eds := NewEdsService(context.Background(), WithConsul(&rslv, 1*time.Second))
 	m := &mockEndpointServer{typeUrl: "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment",
