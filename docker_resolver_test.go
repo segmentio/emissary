@@ -141,7 +141,7 @@ func TestDockerResolver(t *testing.T) {
 		t.Log("got: ", len(endpoints))
 	}
 
-	addr := "0.0.0.0:3002"
+	addr := "172.20.0.3:3000"
 	if endpoints[0].Addr.String() != addr {
 		t.Error("unexpected endpoint")
 		t.Log("got: ", endpoints[0].Addr)
