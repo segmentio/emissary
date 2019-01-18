@@ -30,17 +30,15 @@ func (d *DockerResolver) Lookup(ctx context.Context, service string) ([]Endpoint
 	var endpoints []Endpoint
 	for _, container := range containers {
 		if svc, ok := container.Labels[DockerServiceLabel]; ok && svc == service {
-			var hostIp string
-			var hostPort int
-			for _, portData := range container.Ports {
-				if portData.PrivatePort == DockerServicePort {
-					hostIp = portData.IP
-					hostPort = portData.PublicPort
+			var containerIP string
+			for _, setting := range container.NetworkSettings.Networks {
+				if setting.IPAddress != "" {
+					containerIP = setting.IPAddress
+					break
 				}
-				break
 			}
 
-			addr, err := parseAddr(hostIp, hostPort)
+			addr, err := parseAddr(containerIP, DockerServicePort)
 			if err != nil {
 				continue
 			}
