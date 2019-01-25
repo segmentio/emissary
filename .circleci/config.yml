@@ -28,7 +28,7 @@ jobs:
       - setup_remote_docker: { reusable: true, docker_layer_caching: true }
       - attach_workspace: { at: . }
       - run:
-          name: Building NetC
+          name: Building Emissary
           command: |
             branch=${CIRCLE_BRANCH:-master}
             commit=$(echo -n $CIRCLE_SHA1 | cut -c -7)
@@ -41,41 +41,8 @@ jobs:
           command: |
             docker build -t emissary -f Dockerfile .
       - run:
-          name: Publishing Docker Images (unstable)
-          command: |
-            branch=${CIRCLE_BRANCH:-master}
-            commit=$(git rev-parse --short HEAD)
-            image=${AWS_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/emissary
-            $(aws ecr get-login --no-include-email --region ${AWS_REGION})
-            docker tag emissary ${image}:${commit}
-            docker push ${image}:${commit}
-      - run:
-          name: Saving Docker Image
-          command: |
-            docker save -o docker-cache.tar emissary
-      - persist_to_workspace:
-          root: .
-          paths: [docker-cache.tar]
-
-  publish:
-    working_directory: /go/src/github.com/segmentio/emissary
-    docker:
-      - image: segment/circleci-golang:1.11.0
-    steps:
-      - setup_remote_docker: { reusable: true, docker_layer_caching: true }
-      - attach_workspace: { at: . }
-      - run:
-          name: Publish Docker Image (stable)
-          command: |
-            commit=$(git rev-parse --short HEAD)
-            version=${CIRCLE_TAG:-circleci-$CIRCLE_BUILD_NUM}
-            image=${AWS_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/emissary
-            $(aws ecr get-login --no-include-email --region ${AWS_REGION})
-            docker load < docker-cache.tar
-            docker tag emissary ${image}:${commit}
-            docker tag emissary ${image}:${version}
-            docker tag emissary ${image}:latest
-            docker push ${image}
+          name: Snyk Setup
+          command: curl -sL https://raw.githubusercontent.com/segmentio/snyk_helpers/master/initialization/snyk.sh | sh
 
   lint:
     working_directory: /go/src/github.com/segmentio/emissary
@@ -117,6 +84,7 @@ workflows:
 
       - build:
           requires: [setup]
+          context: snyk
           filters:
             tags: { only: /.*/ }
 
@@ -130,11 +98,3 @@ workflows:
           requires: [setup]
           filters:
             tags: { only: /.*/ }
-
-      - publish:
-          requires:
-            - build
-            - test
-          filters:
-            tags: { only: /.*/ }
-            branches: { ignore: /.*/ }
