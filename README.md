@@ -1,12 +1,10 @@
 # Emissary [![CircleCI](https://circleci.com/gh/segmentio/emissary.svg?style=svg)](https://circleci.com/gh/segmentio/emissary)
 
-`emissary` is a data plane for Envoy https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md
-
-![Emissary Diagram](./emissary.png?raw=true "Emissary Diagram")
+Emissary is a data plane for Envoy https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md
 
 ## Resolvers
 
-`emissary` can currently use Consul or the Docker API as resolvers.
+Emissary can currently use Consul or the Docker API as resolvers.
 
 ### Consul
 
@@ -35,19 +33,19 @@ $ make test Q=
 
 ## Examples
 
-The examples directory currently has two examples you can run locally with docker-compose
+### Using Emissary with Consul
 
-* eds_grpc
-* eds_az_aware_grpc
+[examples/eds_grpc](examples/eds_grpc) and [examples/eds_az_aware_grpc](examples/eds_az_aware_grpc)
+are two examples on how to use Emissary with Consul.
 
 ```
-cd eds_grpc
+cd examples/eds_grpc
 make
 docker-compose up
 ````
 
 ```
-cd eds_az_aware_grpc
+cd examples/eds_az_aware_grpc
 make
 docker-compose up
 ````
@@ -58,4 +56,16 @@ Finally we start a client which connects to envoy
 
 The examples share the same containers so if you start and stop different examples you may need to clean your stopped containers
 
-```docker rm $(docker ps -qa --no-trunc --filter "status=exited")```
+```
+docker rm $(docker ps -qa --no-trunc --filter "status=exited")
+```
+
+### Using Emissary with Docker API
+
+You can use Emissary to discover local Docker containers and load balance traffic to those via Envoy.
+You can find a example for this pattern in [examples/docker_resolver](examples/docker_resolver).
+
+```
+cd examples/docker_resolver
+make up
+```

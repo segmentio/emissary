@@ -41,6 +41,9 @@ jobs:
           command: |
             docker build -t emissary -f Dockerfile .
       - run:
+          name: Snyk Setup
+          command: curl -sL https://raw.githubusercontent.com/segmentio/snyk_helpers/master/initialization/snyk.sh | sh
+      - run:
           name: Publishing Docker Images (unstable)
           command: |
             branch=${CIRCLE_BRANCH:-master}
@@ -117,6 +120,7 @@ workflows:
 
       - build:
           requires: [setup]
+          context: snyk
           filters:
             tags: { only: /.*/ }
 
