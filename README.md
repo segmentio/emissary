@@ -1,12 +1,16 @@
 # Emissary [![CircleCI](https://ci.segment.com/gh/segmentio/emissary.svg?style=svg&circle-token=e31f23668625c3449fe71c8b582ab33191190a50)](https://ci.segment.com/gh/segmentio/emissary)
 
-emissary is a data plane for Envoy https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md
+`emissary` is a data plane for Envoy https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md
 
 ![Emissary Diagram](./emissary.png?raw=true "Emissary Diagram")
 
 ## Resolvers
 
-emissary can currently use Consul or the Docker API as resolvers.
+`emissary` can currently use Consul or the Docker API as resolvers.
+
+### Consul
+
+The Consul resolver will resolve the service to a list of endpoints using the name of the configured virtual host.
 
 ### Docker Resolver
 
