@@ -1,4 +1,4 @@
-# Emissary [![CircleCI](https://ci.segment.com/gh/segmentio/emissary.svg?style=svg&circle-token=e31f23668625c3449fe71c8b582ab33191190a50)](https://ci.segment.com/gh/segmentio/emissary)
+# Emissary [![CircleCI](https://circleci.com/gh/segmentio/emissary.svg?style=svg)](https://circleci.com/gh/segmentio/emissary)
 
 `emissary` is a data plane for Envoy https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md
 
