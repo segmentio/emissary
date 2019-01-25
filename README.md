@@ -6,7 +6,7 @@ Emissary is a data plane for Envoy https://github.com/envoyproxy/data-plane-api/
 
 Emissary can currently use Consul or the Docker API as resolvers.
 
-### Consul
+### Consul Resolver
 
 The Consul resolver will resolve the service to a list of endpoints using the name of the configured virtual host.
 
