@@ -1,6 +1,6 @@
 VERSION     := $(shell git describe --tags --always --dirty="-dev")
 LDFLAGS     := -ldflags='-X "main.version=$(VERSION)"'
-DOCKER_REPO := 528451384384.dkr.ecr.us-west-2.amazonaws.com/emissary
+DOCKER_REPO := segment/emissary
 Q=@
 
 GOTESTFLAGS = -race
