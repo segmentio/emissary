@@ -43,35 +43,6 @@ jobs:
       - run:
           name: Snyk Setup
           command: curl -sL https://raw.githubusercontent.com/segmentio/snyk_helpers/master/initialization/snyk.sh | sh
-      - run:
-          name: Saving Docker Image
-          command: |
-            docker save -o docker-cache.tar emissary
-      - persist_to_workspace:
-          root: .
-          paths: [docker-cache.tar]
-
-#TODO: Figure out if we want to publish to Docker hub.
-#
-#  publish:
-#    working_directory: /go/src/github.com/segmentio/emissary
-#    docker:
-#      - image: segment/circleci-golang:1.11.0
-#    steps:
-#      - setup_remote_docker: { reusable: true, docker_layer_caching: true }
-#      - attach_workspace: { at: . }
-#      - run:
-#          name: Publish Docker Image (stable)
-#          command: |
-#            commit=$(git rev-parse --short HEAD)
-#            version=${CIRCLE_TAG:-circleci-$CIRCLE_BUILD_NUM}
-#            image=${AWS_ACCOUNT_ID}.dkr.ecr.us-west-2.amazonaws.com/emissary
-#            $(aws ecr get-login --no-include-email --region ${AWS_REGION})
-#            docker load < docker-cache.tar
-#            docker tag emissary ${image}:${commit}
-#            docker tag emissary ${image}:${version}
-#            docker tag emissary ${image}:latest
-#            docker push ${image}
 
   lint:
     working_directory: /go/src/github.com/segmentio/emissary
@@ -127,12 +98,3 @@ workflows:
           requires: [setup]
           filters:
             tags: { only: /.*/ }
-
-#TODO: Figure out the publish story
-#      - publish:
-#          requires:
-#            - build
-#            - test
-#          filters:
-#            tags: { only: /.*/ }
-#            branches: { ignore: /.*/ }
