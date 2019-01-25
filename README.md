@@ -1,4 +1,4 @@
-# Emissary [![CircleCI](https://circleci.com/gh/segmentio/emissary.svg?style=svg)](https://circleci.com/gh/segmentio/emissary)
+# Emissary [![CircleCI](https://circleci.com/gh/segmentio/emissary.svg?style=svg)](https://circleci.com/gh/segmentio/emissary) [![GoDoc](https://godoc.org/github.com/segmentio/emissary?status.svg)](https://godoc.org/github.com/segmentio/emissary)
 
 Emissary is a data plane for Envoy https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md
 
