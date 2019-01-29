@@ -4,7 +4,7 @@ Emissary is a data plane for Envoy https://github.com/envoyproxy/data-plane-api/
 
 ## Resolvers
 
-Emissary can currently use Consul or the Docker API as resolvers.
+Emissary currently supports Consul or Docker API resolvers.
 
 ### Consul Resolver
 
@@ -50,9 +50,8 @@ make
 docker-compose up
 ````
 
-Each example starts 2 "server" containers with a trivial http server listening on port 8077. It then starts an envoy
-instance to serve as the loadbalancer for the upstream server cluster. Additionally we start a consul and registrator containers.
-Finally we start a client which connects to envoy
+Each example starts 2 "server" containers, which run a trivial http server listening on port 8077. It then starts an envoy
+instance to serve as the loadbalancer for the upstream server clusters. Additionally we start consul and registrator containers. Finally we start a client which connects to server clusters via envoy.
 
 The examples share the same containers so if you start and stop different examples you may need to clean your stopped containers
 
